@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#3658d4">
+  <meta name="description" content="Turn your courses and preferences into a clash-free weekly timetable, then fine-tune it in your own words.">
+  <title>CourseFit — Your semester, in balance</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" type="module"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to planner</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="CourseFit home"><img src="/favicon.svg" width="38" height="38" alt=""><span>Course<span class="brand-light">Fit</span></span></a>
+      <div class="header-divider"></div><span class="workspace-name">Semester planner</span>
+      <div class="header-actions"><span class="local-badge"><span class="status-dot"></span>Local workspace</span><button class="button button-quiet" id="open-settings" type="button"><span id="settings-icon" aria-hidden="true"></span>Settings<span id="connection-dot" class="connection-dot" aria-label="Not connected"></span></button></div>
+    </div>
+  </header>
+  <main id="main-content" class="workspace">
+    <nav id="steps" class="steps" aria-label="Planning progress"></nav>
+    <div id="main-message" class="notice notice-error" role="alert" hidden></div>
+    <div id="app"><p class="startup">Opening your workspace…</p></div>
+  </main>
+  <footer class="site-footer"><span class="footer-brand">A little planning. A better semester.</span><span>Based on your section data. Availability and registration are not checked.</span><button type="button" class="text-button" id="open-about">How CourseFit works</button></footer>
+  <div id="status" class="sr-only" role="status" aria-live="polite"></div>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="dialog-heading"><div><span class="dialog-symbol" id="settings-symbol" aria-hidden="true"></span><h2 id="settings-title">Connect DeepSeek</h2></div><button class="icon-button" data-close="settings-dialog" type="button" aria-label="Close settings">×</button></div>
+    <p class="muted">Your key connects the language step. Timetable solving runs on your computer.</p>
+    <form id="settings-form">
+      <label for="api-key">DeepSeek API key</label>
+      <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your API key">
+      <p id="key-help" class="field-help">Your key is never returned to the browser or included in exports.</p>
+      <label for="model-name">Model</label><input id="model-name" value="deepseek-flash" required maxlength="80" pattern="[a-zA-Z0-9._\-]+" spellcheck="false">
+      <label class="checkbox-label"><input id="remember-key" type="checkbox" checked><span>Remember the key on this device<span class="field-help">Saved in a local file with owner-only permissions, excluded from Git. Uncheck to keep it for this server session only.</span></span></label>
+      <div id="settings-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-actions"><button class="button button-danger-quiet" id="forget-key" type="button">Forget saved key</button><button class="button button-primary" id="save-settings" type="submit">Save settings</button></div>
+    </form>
+    <p class="settings-note">Parsing sends your course text to DeepSeek. Keep names, student IDs, emails and other personal information out of your input.</p>
+  </dialog>
+
+  <dialog id="examples-dialog" aria-labelledby="examples-title">
+    <div class="dialog-heading"><h2 id="examples-title">Try a different kind of week</h2><button class="icon-button" data-close="examples-dialog" type="button" aria-label="Close examples">×</button></div>
+    <p class="muted">These examples are already parsed. Complete examples generate immediately, without an API key or model call.</p>
+    <div id="example-options"></div>
+  </dialog>
+
+  <dialog id="about-dialog" aria-labelledby="about-title">
+    <div class="dialog-heading"><h2 id="about-title">A good week, one step at a time</h2><button class="icon-button" data-close="about-dialog" type="button" aria-label="Close explanation">×</button></div>
+    <ol class="about-steps"><li><strong>Bring your shortlist.</strong><p>Paste your courses, section options and preferences. There is no course or section count limit. Midnight catalogue slots ending at 08:00 or 08:20 are treated as online classes with no fixed meeting.</p></li><li><strong>Answer once, if needed.</strong><p>Any essential questions are grouped into one batch of up to five. Your answers go straight into generation, with no extra confirmation.</p></li><li><strong>Find your fit, then fine-tune.</strong><p>Compare clash-free options and describe any adjustment in your own words. Only timetables satisfying every hard constraint are shown; each soft preference earns one point.</p></li></ol>
+    <div class="notice notice-info">CourseFit does not choose courses for you, enrol you, or check seats. Times repeat weekly in the local times you provide; dates, alternating weeks and travel time are not modelled.</div>
+    <p class="field-help">Plans stay in server memory for up to two hours and disappear when the server restarts. Large searches have a time budget; incomplete searches are labelled. Model explanations are optional; preference checks come directly from the solver.</p>
+  </dialog>
+  <noscript><div class="notice notice-error">Enable JavaScript to use CourseFit. Your course text is sent to DeepSeek when you generate or adjust a timetable.</div></noscript>
+</body>
+</html>
