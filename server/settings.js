@@ -30,7 +30,7 @@ export class SettingsStore {
   async load() {
     try {
       const saved = JSON.parse(await readFile(this.file, 'utf8'));
-      // Settings saved before providers existed are DeepSeek settings.
+      // Settings saved before providers existed are legacy provider settings.
       const provider = findProvider(saved?.provider) ? saved.provider : DEFAULT_PROVIDER;
       const defaults = findProvider(provider);
       if (!this.settings.apiKey && typeof saved.apiKey === 'string') {

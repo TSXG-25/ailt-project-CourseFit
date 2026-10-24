@@ -62,7 +62,7 @@ test('missing data always creates a clarification', async () => {
 });
 
 test('missing key, invalid text, provider failures and timeout are actionable', async () => {
-  await assert.rejects(parseInput('course', {}), /Connect DeepSeek/);
+  await assert.rejects(parseInput('course', {}), /Connect a model/);
   await assert.rejects(parseInput(' ', settings), /1 and 100,000/);
   await assert.rejects(parseInput('x'.repeat(100001), settings), /1 and 100,000/);
   await assert.rejects(modelJSON([], settings, { fetchImpl: async () => new Response('secret-provider-error', { status: 401 }) }), error => /rejected this API key/.test(error.message) && !error.message.includes('secret'));

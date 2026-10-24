@@ -48,7 +48,7 @@ If the input contains no course data, return empty arrays and ask for courses an
 export async function modelJSON(messages, settings, { fetchImpl = fetch, maxTokens = 8192 } = {}) {
   const provider = resolveProvider(settings);
   const label = provider.name;
-  if (!settings.apiKey) throw new InputError(`Connect ${label} in Model, or load a pre-parsed example to try CourseFit without an API key.`, 503);
+  if (!settings.apiKey) throw new InputError('Connect a model in Model, or load a pre-parsed example to try CourseFit without an API key.', 503);
   const model = settings.model || provider.defaultModel || DEFAULT_MODEL;
   const { url, headers, body } = buildChatRequest(provider, { messages, model, maxTokens, apiKey: settings.apiKey });
   let response;

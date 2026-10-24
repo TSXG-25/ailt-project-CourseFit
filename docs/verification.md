@@ -25,7 +25,7 @@ A separate temporary local server, fake credentials and mocked provider were exe
 - Input, question, result and online layouts were checked at 375px, 768px and 1440px. No page-level horizontal overflow or browser JavaScript errors occurred.
 - Keyboard skip navigation, native labels/dialogs and literal HTML text handling were checked. This is not a full assistive-technology audit.
 
-## Authorized live DeepSeek regression
+## Authorized live provider regression
 
 Using the already authorized course table and confirmed preferences, the new generation flow completed with two real provider requests, without correction retries. The table and raw responses remain in owner-only temporary diagnostic files outside the repository; no key was logged or changed.
 
@@ -37,6 +37,6 @@ Finishing the batch with missing facts produced an actionable result, with no se
 
 ## Accuracy scope
 
-The 22-case manually specified language evaluation set remains schema/provenance validated, but the full paid DeepSeek evaluation has not been run. One real catalogue regression does not establish the proposal's field/hard-constraint/ambiguity accuracy targets. Run `npm run evaluate:parsing` to measure all 22 cases, with up to 44 provider requests including correction attempts.
+The 22-case manually specified language evaluation set remains schema/provenance validated, but the full paid model evaluation has not been run. One real catalogue regression does not establish the proposal's field/hard-constraint/ambiguity accuracy targets. Run `npm run evaluate:parsing` to measure all 22 cases, with up to 44 provider requests including correction attempts.
 
 No deployment, Git commit or Git push has been performed.

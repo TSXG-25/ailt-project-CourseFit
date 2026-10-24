@@ -82,10 +82,10 @@ function focusHeading() { $('#page-title')?.focus({ preventScroll: true }); wind
 function updateConnection() {
   const dot = $('#connection-dot');
   dot.classList.toggle('connected', state.config.configured);
-  dot.setAttribute('aria-label', state.config.configured ? 'DeepSeek configured' : 'DeepSeek not configured');
+  dot.setAttribute('aria-label', state.config.configured ? 'Model configured' : 'Model not configured');
   const modelLabel = $('#model-label');
   modelLabel.textContent = state.config.configured ? state.config.model : 'Model';
-  $('#open-model').setAttribute('aria-label', state.config.configured ? `Model, DeepSeek configured (${state.config.model})` : 'Model, connect DeepSeek');
+  $('#open-model').setAttribute('aria-label', state.config.configured ? `Model, configured (${state.config.model})` : 'Model, connect a model');
 }
 function renderSteps() {
   const titles = ['Your courses', 'A few details', 'Your timetable'];
@@ -112,9 +112,9 @@ function renderInput() {
       <div class="input-label"><label for="course-input">Courses, section times & preferences</label><div class="input-tools"><button class="text-button" type="button" data-action="clear-input">Clear input</button><button class="text-button" type="button" data-action="format">Use this format</button></div></div>
       <textarea id="course-input" maxlength="100000" required placeholder="${e(placeholder)}" ${state.busy ? 'disabled' : ''}>${e(state.input)}</textarea>
       <div class="input-toolbar"><span>Include every lecture and tutorial in each section.</span><span id="character-count">${state.input.length.toLocaleString()} / 100,000</span></div>
-      <div class="privacy-note">${icon('lock')}<span>Use course information only. Leave out personal details. Generating your timetable sends this text to DeepSeek; examples stay local.</span></div>
+      <div class="privacy-note">${icon('lock')}<span>Use course information only. Leave out personal details. Generating your timetable sends this text to your model; examples stay local.</span></div>
       <div class="form-actions"><button type="button" class="button button-secondary" data-action="examples" ${state.busy ? 'disabled' : ''}>${icon('calendar')}Try an example</button><button class="button button-primary" id="parse-button" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Reading your input…' : `Generate my timetable${icon('arrow')}`}</button></div>
-      <p class="field-help" style="margin-bottom:0;margin-top:16px">${state.config.configured ? `DeepSeek is configured (${e(state.config.model)}). A few questions if needed, then straight to your timetable.` : 'No API key yet? Try a pre-parsed example, or connect DeepSeek in Model.'}</p>
+      <p class="field-help" style="margin-bottom:0;margin-top:16px">${state.config.configured ? `Your model (${e(state.config.model)}) is configured. A few questions if needed, then straight to your timetable.` : 'No API key yet? Try a pre-parsed example, or connect a model in Model.'}</p>
     </form>
     <aside class="input-aside">
       <section class="panel preview-panel" aria-label="Illustrative weekly timetable, not a generated result">
@@ -167,7 +167,7 @@ function renderReview() {
       <p class="panel-description">Answer the details you know. Leave anything optional blank; unresolved course data will be shown with your result.</p>
       <div class="clarification-list">${questions.map((question, i) => `<label for="answer-${i}"><span class="question-number">${i + 1}</span>${e(question)}<textarea id="answer-${i}" data-question="${i}" maxlength="1000" rows="2" placeholder="Your answer">${e(state.resolutions[question] || '')}</textarea></label>`).join('')}</div>
       <div class="form-actions"><button type="button" class="button button-quiet" data-action="step" data-index="0">${icon('back')}Edit input</button><button type="submit" class="button button-primary" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Building your week…' : `Generate my timetable${icon('arrow')}`}</button></div>
-      <p class="field-help">No extra confirmation. Answers are applied with DeepSeek; solving runs locally.</p>
+      <p class="field-help">No extra confirmation. Answers are applied with your model; solving runs locally.</p>
     </form>${renderPlanDetails()}</div>`;
 }
 
@@ -176,7 +176,7 @@ function renderRefinement() {
     <div class="panel-title"><h2>Fine-tune your timetable</h2><span class="pill">Keep the conversation going</span></div>
     <label for="adjustment-input">What would you like to change?</label>
     <div class="refinement-controls"><textarea id="adjustment-input" maxlength="2000" rows="2" required placeholder="e.g. Allow 09:00 classes, keep Friday free if possible, and leave 30 minutes between classes." ${state.busy ? 'disabled' : ''}>${e(state.adjustment)}</textarea><button type="submit" class="button button-primary" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Updating…' : `Update timetable${icon('arrow')}`}</button></div>
-    <p class="field-help">Changes apply directly. Everything else stays as it is. ${state.config.configured ? 'Uses DeepSeek.' : 'Connect DeepSeek in Model to apply an adjustment.'}</p>
+    <p class="field-help">Changes apply directly. Everything else stays as it is. ${state.config.configured ? 'Uses your model.' : 'Connect a model in Model to apply an adjustment.'}</p>
   </form>`;
 }
 
@@ -233,7 +233,7 @@ function renderResults() {
   ${allHard ? `<ul class="preference-checks">${state.plan.hardConstraints.map(rule => `<li><span class="met">${icon('check')}</span><span>${e(describe(rule))}<span class="muted"> — required, met</span></span></li>`).join('')}</ul>` : ''}
   ${schedule.preferences.length ? `<ul class="preference-checks">${schedule.preferences.map(preference => `<li><span class="${preference.satisfied ? 'met' : 'missed'}">${icon(preference.satisfied ? 'check' : 'minus')}</span><span>${e(preference.label)}<span class="muted"> — ${preference.satisfied ? 'met' : 'not met'}</span></span></li>`).join('')}</ul>` : ''}
   <p style="line-height:1.8">${e(schedule.explanation)}</p>
-  ${explanation ? `<div class="ai-explanation"><span class="pill">${icon('sparkle')}DeepSeek commentary</span><p>${e(explanation)}</p><span class="field-help">The verified preference checks above remain the source of truth.</span></div>` : `<button type="button" class="text-button" style="font-size:calc(0.733rem * var(--font-scale-button));margin-top:12px" data-action="explain" ${state.explaining ? 'disabled' : ''}>${state.explaining === schedule.id ? 'DeepSeek is writing an explanation…' : state.config.configured ? 'Explain this week with DeepSeek' : 'Connect DeepSeek for a more detailed explanation'}</button>`}
+  ${explanation ? `<div class="ai-explanation"><span class="pill">${icon('sparkle')}Model commentary</span><p>${e(explanation)}</p><span class="field-help">The verified preference checks above remain the source of truth.</span></div>` : `<button type="button" class="text-button" style="font-size:calc(0.733rem * var(--font-scale-button));margin-top:12px" data-action="explain" ${state.explaining ? 'disabled' : ''}>${state.explaining === schedule.id ? 'The model is writing an explanation…' : state.config.configured ? 'Explain this week with your model' : 'Connect a model for a more detailed explanation'}</button>`}
   </div>
   <details class="meeting-list"><summary>View every selected section & meeting</summary><ul>${[...schedule.meetings].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || minute(a.start) - minute(b.start)).map(m => `<li>${e(m.day)} ${e(m.start)}–${e(m.end)} — ${e(m.courseId)} ${e(m.courseName)}, section ${e(m.sectionId)}</li>`).join('')}${schedule.selections.filter(selection => state.plan.courses.find(course => course.id === selection.courseId)?.sections.find(section => section.id === selection.sectionId)?.asynchronous).map(selection => `<li>${e(selection.courseId)}, section ${e(selection.sectionId)} — no fixed weekly meetings (asynchronous)</li>`).join('')}</ul></details>
   </section></div>${renderPlanDetails()}`;
@@ -348,7 +348,7 @@ function syncProviderNote() {
   showProviderNote(state.providers.find(item => item.name.toLowerCase() === value) || null);
 }
 // The value the model field would hold without user typing: the saved model
-// when a key is configured, otherwise the DeepSeek default and nothing else.
+// when a key is configured, otherwise the provider default and nothing else.
 function modelFieldValue(provider) {
   if (state.config.configured) return state.config.model || '';
   return provider && provider.id === 'deepseek' ? 'deepseek-flash' : '';
@@ -397,7 +397,7 @@ function openModel() {
   const configured = state.config.provider || 'deepseek';
   selectProvider(configured);
   // The model field reflects saved settings only. Without a saved (or
-  // environment-provided) key there is nothing to show, except the DeepSeek
+  // environment-provided) key there is nothing to show, except the provider
   // default which is filled in as a convenience.
   setModel(modelFieldValue(providerById(configured)));
   $('#custom-base-url').value = state.config.baseUrl || '';
@@ -462,7 +462,7 @@ async function explainSchedule() {
   try {
     const output = await api('/api/explain', { method: 'POST', body: { confirmationId: state.confirmationId, scheduleId: schedule.id } });
     state.explanations[schedule.id] = output.explanation;
-    announce('DeepSeek commentary is ready.');
+    announce('Model commentary is ready.');
   } finally { state.explaining = null; render(); }
 }
 
@@ -593,7 +593,7 @@ $('#forget-key').addEventListener('click', async () => {
   try {
     state.config = await api('/api/config', { method: 'DELETE' });
     $('#api-key').value = ''; $('#model-dialog').close(); render();
-    announce(state.config.configured ? 'Saved key removed. An environment variable still provides a key; remove it from .env to disconnect completely.' : 'Saved key removed. DeepSeek is disconnected.');
+    announce(state.config.configured ? 'Saved key removed. An environment variable still provides a key; remove it from .env to disconnect completely.' : 'Saved key removed. The model is disconnected.');
   } catch (error) { $('#model-error').textContent = error.message; $('#model-error').hidden = false; }
   finally { $('#forget-key').disabled = !state.config.configured; }
 });
