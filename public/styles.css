@@ -262,6 +262,7 @@
   .combo-option:hover { background: #f4f6fc; }
   .combo-option.selected { background: #eff3ff; color: var(--blue); font-weight: 600; }
   .combo-note { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: #eef2fb; color: var(--muted); font-size: calc(0.667rem * var(--font-scale-other)); font-weight: 400; }
+  #provider-note { position: absolute; left: 0; top: 50%; transform: translateY(-50%); pointer-events: none; white-space: nowrap; }
   .combo-empty { margin: 0; padding: 10px 8px; color: var(--muted); font-size: calc(0.733rem * var(--font-scale-other)); line-height: 1.6; }
   .dialog-actions { display: flex; justify-content: space-between; gap: 16px; margin-top: 22px; }
   .settings-note { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 18px; font-size: calc(0.733rem * var(--font-scale-other)); color: var(--muted); }

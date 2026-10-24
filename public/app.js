@@ -319,6 +319,34 @@ function setModel(value) {
 function providerById(id) {
   return state.providers.find(item => item.id === id) || null;
 }
+// Shows the provider's billing note as a chip right after the typed name,
+// mirroring how it appears in the dropdown. Hidden unless the field exactly
+// matches a provider name.
+let noteMeasureContext = null;
+function showProviderNote(provider) {
+  const noteEl = $('#provider-note');
+  const combo = $('#provider-combo');
+  const input = $('#provider-input');
+  if (provider && provider.note) {
+    noteEl.textContent = provider.note;
+    noteEl.hidden = false;
+    combo.classList.add('has-note');
+    noteMeasureContext = noteMeasureContext || document.createElement('canvas').getContext('2d');
+    const style = getComputedStyle(input);
+    noteMeasureContext.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const textWidth = noteMeasureContext.measureText(input.value).width;
+    noteEl.style.left = `${Math.round(parseFloat(style.paddingLeft) + textWidth + 8)}px`;
+  } else {
+    noteEl.hidden = true;
+    combo.classList.remove('has-note');
+  }
+}
+// Derives the note from whatever the field currently holds, so the chip can
+// never disagree with the visible name. Runs on every input and selection.
+function syncProviderNote() {
+  const value = $('#provider-input').value.trim().toLowerCase();
+  showProviderNote(state.providers.find(item => item.name.toLowerCase() === value) || null);
+}
 // The value the model field would hold without user typing: the saved model
 // when a key is configured, otherwise the DeepSeek default and nothing else.
 function modelFieldValue(provider) {
@@ -332,6 +360,7 @@ function selectProvider(id) {
   state.provider = provider.id;
   state.models = [];
   $('#provider-input').value = provider.name;
+  syncProviderNote();
   $('#custom-fields').hidden = !provider.needsBaseUrl;
   $('#get-models').hidden = Boolean(provider.needsBaseUrl);
   $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : (provider.keyHint || `Enter your ${provider.name} API key`);
@@ -508,16 +537,17 @@ $('#provider-input').addEventListener('focus', () => {
   // Focusing clears the field so the user retypes; blur restores the previous
   // provider when the new text is not an exact match.
   $('#provider-input').value = '';
+  syncProviderNote();
   openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions);
 });
-$('#provider-input').addEventListener('input', () => openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions));
+$('#provider-input').addEventListener('input', () => { syncProviderNote(); openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions); });
 $('#provider-input').addEventListener('blur', () => {
   const query = $('#provider-input').value.trim().toLowerCase();
   const match = state.providers.find(item => item.name.toLowerCase() === query || item.id === query);
   if (match) selectProvider(match.id);
   else {
     const current = providerById(state.provider);
-    if (current) $('#provider-input').value = current.name;
+    if (current) { $('#provider-input').value = current.name; syncProviderNote(); }
   }
 });
 $('#provider-input').addEventListener('keydown', event => {
