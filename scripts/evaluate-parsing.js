@@ -8,7 +8,7 @@ import { compareParsing } from '../evaluation/metrics.js';
 const settings = new SettingsStore(fileURLToPath(new URL('../.local/settings.json', import.meta.url)));
 await settings.load();
 if (!settings.public().configured) {
-  console.error('Parsing evaluation needs a real DeepSeek key. Save one with “Remember the key” in the app, or set DEEPSEEK_API_KEY in .env. This command evaluates 22 cases with up to 44 paid API calls, including bounded correction attempts; no model accuracy is claimed until it runs.');
+  console.error(`Parsing evaluation needs a real ${settings.public().providerName} key. Save one with “Remember the key” in the app, or set COURSEFIT_API_KEY in .env. This command evaluates 22 cases with up to 44 paid API calls, including bounded correction attempts; no model accuracy is claimed until it runs.`);
   process.exit(1);
 }
 

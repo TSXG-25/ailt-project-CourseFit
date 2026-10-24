@@ -2,7 +2,7 @@
 
 Your semester, in balance. CourseFit turns shortlisted courses, available sections and plain-English preferences into ranked, clash-free weekly timetables.
 
-Built for AILT9019. The application runs locally, with an English interface and DeepSeek for language parsing. The constraint solver, ranking, independent validation and pre-parsed examples work without a model API key.
+Built for AILT9019. The application runs locally, with an English interface and a configurable model for language parsing. The constraint solver, ranking, independent validation and pre-parsed examples work without a model API key.
 
 ## Start
 
@@ -18,7 +18,7 @@ Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)**. No dependency installat
 2. If essential details are unclear, answer one batch of up to five questions. Answers go straight into generation; there is no confirmation checkbox.
 3. Compare the options and use **Fine-tune your timetable** to describe changes in ordinary language. You can also save or print the selected week.
 
-To use your own plain-English input, open **Settings**, enter a DeepSeek API key, and save. The default model is `deepseek-flash`; change it if your account uses a different supported model. Saving settings stores the configuration; the first parse request tests the connection. Obtain your key from the [DeepSeek platform](https://platform.deepseek.com/).
+To use your own plain-English input, open **Settings**, enter an API key for your chosen provider, and save. The default model is `deepseek-flash`; change it if your account uses a different supported model. Saving settings stores the configuration; the first parse request tests the connection. Obtain a key from your provider.
 
 **Remember the key on this device** saves it in `.local/settings.json`, with owner-only file permissions. Uncheck it to keep it only for the current server session. **Forget saved key** deletes the saved key. Keys supplied by an environment variable must also be removed from that environment to disconnect completely.
 
@@ -75,11 +75,11 @@ If no combination works, the app displays **No feasible schedule found** with a 
 
 ## Data checks and privacy
 
-- DeepSeek output is untrusted data. The server validates its structure and source quotes before review. Harmless whitespace, dash, quotation-mark and full-width character differences are matched back to an actual substring of your original input. Changed words, numbers or missing source quotes are not silently accepted. Invalid structure or quotes get at most **one correction request**, then fail with a specific error if still invalid. Source quotes help trace an extraction; they cannot prove that the model interpreted every time correctly.
+- Model output is untrusted data. The server validates its structure and source quotes before review. Harmless whitespace, dash, quotation-mark and full-width character differences are matched back to an actual substring of your original input. Changed words, numbers or missing source quotes are not silently accepted. Invalid structure or quotes get at most **one correction request**, then fail with a specific error if still invalid. Source quotes help trace an extraction; they cannot prove that the model interpreted every time correctly.
 - Unclear data appears in one batch of up to five questions. Applying answers generates directly; remaining issues are notes or missing-data blockers, never another required question round.
 - **Generate** and **Update timetable** authorize generation. The server saves a validated immutable snapshot internally, with no repeated acknowledgement step. Current plan data is authoritative for adjustments, so older restrictions are not restored accidentally.
 - An independent overlap and hard-constraint validator checks every returned timetable. The displayed meeting data is derived from the selected sections.
-- Parsing, answering questions and natural-language adjustments send course data to `https://api.deepseek.com/chat/completions`. Optional DeepSeek commentary sends the selected timetable and verified preference results. Complete examples and deterministic explanations do not call a model.
+- Parsing, answering questions and natural-language adjustments send course data to your provider's chat endpoint (the default DeepSeek setup uses `https://api.deepseek.com/chat/completions`). Optional model commentary sends the selected timetable and verified preference results. Complete examples and deterministic explanations do not call a model.
 - Do not enter names, student IDs, emails or other personal identifiers. Course data and generated snapshots are held in memory for up to two hours, with bounded storage, and disappear on server restart. Downloads are saved only when you select Save. API keys are never returned by server endpoints or included in timetable exports.
 - The server binds to `127.0.0.1`, rejects foreign hosts/origins, and only exposes explicitly allowed public assets. It is a single-user local application, not a multi-user hosted service.
 
@@ -99,9 +99,9 @@ The fixed language evaluation set contains **22 manually prepared requests and e
 npm run evaluate:parsing
 ```
 
-This uses a key saved with **Remember the key** or supplied through `.env` and evaluates **22 cases**, making **22–44 paid DeepSeek requests** if all cases reach the provider, including at most one correction request per case. The report records actual request counts, field extraction accuracy, exact hard-constraint accuracy, ambiguity detection, unexpected clarification counts and safe failures in `.local/parsing-evaluation.json`. Targets are ≥95%, ≥95% and 100%, respectively. Source-quote wording and question wording are excluded from semantic accuracy.
+This uses a key saved with **Remember the key** or supplied through `.env` and evaluates **22 cases**, making **22–44 paid model requests** if all cases reach the provider, including at most one correction request per case. The report records actual request counts, field extraction accuracy, exact hard-constraint accuracy, ambiguity detection, unexpected clarification counts and safe failures in `.local/parsing-evaluation.json`. Targets are ≥95%, ≥95% and 100%, respectively. Source-quote wording and question wording are excluded from semantic accuracy.
 
-**Fixed-set DeepSeek accuracy has not yet been measured.** A separately authorized real catalogue regression passed, but it does not establish the proposal's accuracy targets. Mock provider tests validate integration and failure handling. See [verification notes](docs/verification.md) for completed checks and remaining validation.
+**Fixed-set model accuracy has not yet been measured.** A separately authorized real catalogue regression passed, but it does not establish the proposal's accuracy targets. Mock provider tests validate integration and failure handling. See [verification notes](docs/verification.md) for completed checks and remaining validation.
 
 ## Project layout
 

@@ -11,7 +11,7 @@ test('one-round generation API and subsequent adjustments require no confirmatio
   const dir = await mkdtemp(join(tmpdir(), 'coursefit-generate-'));
   let output = structuredClone(PARSING_CASES[0].expected);
   let calls = 0;
-  const server = await createApp({ settingsFile: join(dir, 'settings.json'), env: { DEEPSEEK_API_KEY: 'fake-test-only' }, fetchImpl: async () => {
+  const server = await createApp({ settingsFile: join(dir, 'settings.json'), env: { COURSEFIT_API_KEY: 'fake-test-only' }, fetchImpl: async () => {
     calls++;
     return new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(output) } }] }));
   } });

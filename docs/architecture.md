@@ -6,7 +6,7 @@ CourseFit uses Node.js 22+ built-ins and browser-native JavaScript/CSS. The lang
 
 ```mermaid
 flowchart LR
-  A[Course text and preferences] --> B[DeepSeek JSON extraction]
+  A[Course text and preferences] --> B[Model JSON extraction]
   B --> C[Schema and source checks]
   C --> D{Essential questions?}
   D -->|Yes, once| E[One batch of up to five questions]
@@ -72,6 +72,6 @@ Drafts, snapshots and cached results are bounded to 100 entries and expire after
 
 ## Model and local server boundary
 
-Only one provider request runs at a time. DeepSeek requests use the fixed HTTPS endpoint, JSON mode and a 90-second timeout. Invalid schema or quotes receive at most one correction attempt. Empty, malformed or truncated JSON fails safely. Provider bodies and credentials never enter client error messages.
+Only one provider request runs at a time. Requests use the provider's configured HTTPS endpoint, JSON mode and a 90-second timeout. Invalid schema or quotes receive at most one correction attempt. Empty, malformed or truncated JSON fails safely. Provider bodies and credentials never enter client error messages.
 
 The server binds to IPv4 loopback and rejects foreign hosts/origins. Mutation endpoints require JSON. There is no multi-user authentication; this is a local workspace, not a public hosted service. Optional model commentary is labelled and never changes solver facts or scores.

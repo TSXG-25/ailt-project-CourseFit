@@ -27,7 +27,7 @@ const ICONS = {
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.calendar}</svg>`;
 const colorStyle = index => { const [bg, ink, border] = COLORS[index % COLORS.length]; return `--course-bg:${bg};--course-ink:${ink};--course-border:${border}`; };
 const minute = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
-const state = { step: 0, input: '', examples: [], config: { configured: false }, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
+const state = { step: 0, input: '', examples: [], config: { configured: false }, providers: [], protocols: [], provider: 'deepseek', models: [], checking: false, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
 const FONT_SCALES = { small: 0.9, medium: 1, large: 1.15, xlarge: 1.3 };
 const FONT_KEYS = ['small', 'medium', 'large', 'xlarge'];
 const FONT_LABELS = { small: 'Small', medium: 'Medium', large: 'Large', xlarge: 'Extra large' };
@@ -82,10 +82,10 @@ function focusHeading() { $('#page-title')?.focus({ preventScroll: true }); wind
 function updateConnection() {
   const dot = $('#connection-dot');
   dot.classList.toggle('connected', state.config.configured);
-  dot.setAttribute('aria-label', state.config.configured ? 'DeepSeek configured' : 'DeepSeek not configured');
+  dot.setAttribute('aria-label', state.config.configured ? 'Model configured' : 'Model not configured');
   const modelLabel = $('#model-label');
   modelLabel.textContent = state.config.configured ? state.config.model : 'Model';
-  $('#open-model').setAttribute('aria-label', state.config.configured ? `Model, DeepSeek configured (${state.config.model})` : 'Model, connect DeepSeek');
+  $('#open-model').setAttribute('aria-label', state.config.configured ? `Model, configured (${state.config.model})` : 'Model, connect a model');
 }
 function renderSteps() {
   const titles = ['Your courses', 'A few details', 'Your timetable'];
@@ -112,9 +112,9 @@ function renderInput() {
       <div class="input-label"><label for="course-input">Courses, section times & preferences</label><div class="input-tools"><button class="text-button" type="button" data-action="clear-input">Clear input</button><button class="text-button" type="button" data-action="format">Use this format</button></div></div>
       <textarea id="course-input" maxlength="100000" required placeholder="${e(placeholder)}" ${state.busy ? 'disabled' : ''}>${e(state.input)}</textarea>
       <div class="input-toolbar"><span>Include every lecture and tutorial in each section.</span><span id="character-count">${state.input.length.toLocaleString()} / 100,000</span></div>
-      <div class="privacy-note">${icon('lock')}<span>Use course information only. Leave out personal details. Generating your timetable sends this text to DeepSeek; examples stay local.</span></div>
+      <div class="privacy-note">${icon('lock')}<span>Use course information only. Leave out personal details. Generating your timetable sends this text to your model; examples stay local.</span></div>
       <div class="form-actions"><button type="button" class="button button-secondary" data-action="examples" ${state.busy ? 'disabled' : ''}>${icon('calendar')}Try an example</button><button class="button button-primary" id="parse-button" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Reading your input…' : `Generate my timetable${icon('arrow')}`}</button></div>
-      <p class="field-help" style="margin-bottom:0;margin-top:16px">${state.config.configured ? `DeepSeek is configured (${e(state.config.model)}). A few questions if needed, then straight to your timetable.` : 'No API key yet? Try a pre-parsed example, or connect DeepSeek in Model.'}</p>
+      <p class="field-help" style="margin-bottom:0;margin-top:16px">${state.config.configured ? `Your model (${e(state.config.model)}) is configured. A few questions if needed, then straight to your timetable.` : 'No API key yet? Try a pre-parsed example, or connect a model in Model.'}</p>
     </form>
     <aside class="input-aside">
       <section class="panel preview-panel" aria-label="Illustrative weekly timetable, not a generated result">
@@ -167,7 +167,7 @@ function renderReview() {
       <p class="panel-description">Answer the details you know. Leave anything optional blank; unresolved course data will be shown with your result.</p>
       <div class="clarification-list">${questions.map((question, i) => `<label for="answer-${i}"><span class="question-number">${i + 1}</span>${e(question)}<textarea id="answer-${i}" data-question="${i}" maxlength="1000" rows="2" placeholder="Your answer">${e(state.resolutions[question] || '')}</textarea></label>`).join('')}</div>
       <div class="form-actions"><button type="button" class="button button-quiet" data-action="step" data-index="0">${icon('back')}Edit input</button><button type="submit" class="button button-primary" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Building your week…' : `Generate my timetable${icon('arrow')}`}</button></div>
-      <p class="field-help">No extra confirmation. Answers are applied with DeepSeek; solving runs locally.</p>
+      <p class="field-help">No extra confirmation. Answers are applied with your model; solving runs locally.</p>
     </form>${renderPlanDetails()}</div>`;
 }
 
@@ -176,7 +176,7 @@ function renderRefinement() {
     <div class="panel-title"><h2>Fine-tune your timetable</h2><span class="pill">Keep the conversation going</span></div>
     <label for="adjustment-input">What would you like to change?</label>
     <div class="refinement-controls"><textarea id="adjustment-input" maxlength="2000" rows="2" required placeholder="e.g. Allow 09:00 classes, keep Friday free if possible, and leave 30 minutes between classes." ${state.busy ? 'disabled' : ''}>${e(state.adjustment)}</textarea><button type="submit" class="button button-primary" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Updating…' : `Update timetable${icon('arrow')}`}</button></div>
-    <p class="field-help">Changes apply directly. Everything else stays as it is. ${state.config.configured ? 'Uses DeepSeek.' : 'Connect DeepSeek in Model to apply an adjustment.'}</p>
+    <p class="field-help">Changes apply directly. Everything else stays as it is. ${state.config.configured ? 'Uses your model.' : 'Connect a model in Model to apply an adjustment.'}</p>
   </form>`;
 }
 
@@ -233,7 +233,7 @@ function renderResults() {
   ${allHard ? `<ul class="preference-checks">${state.plan.hardConstraints.map(rule => `<li><span class="met">${icon('check')}</span><span>${e(describe(rule))}<span class="muted"> — required, met</span></span></li>`).join('')}</ul>` : ''}
   ${schedule.preferences.length ? `<ul class="preference-checks">${schedule.preferences.map(preference => `<li><span class="${preference.satisfied ? 'met' : 'missed'}">${icon(preference.satisfied ? 'check' : 'minus')}</span><span>${e(preference.label)}<span class="muted"> — ${preference.satisfied ? 'met' : 'not met'}</span></span></li>`).join('')}</ul>` : ''}
   <p style="line-height:1.8">${e(schedule.explanation)}</p>
-  ${explanation ? `<div class="ai-explanation"><span class="pill">${icon('sparkle')}DeepSeek commentary</span><p>${e(explanation)}</p><span class="field-help">The verified preference checks above remain the source of truth.</span></div>` : `<button type="button" class="text-button" style="font-size:calc(0.733rem * var(--font-scale-button));margin-top:12px" data-action="explain" ${state.explaining ? 'disabled' : ''}>${state.explaining === schedule.id ? 'DeepSeek is writing an explanation…' : state.config.configured ? 'Explain this week with DeepSeek' : 'Connect DeepSeek for a more detailed explanation'}</button>`}
+  ${explanation ? `<div class="ai-explanation"><span class="pill">${icon('sparkle')}Model commentary</span><p>${e(explanation)}</p><span class="field-help">The verified preference checks above remain the source of truth.</span></div>` : `<button type="button" class="text-button" style="font-size:calc(0.733rem * var(--font-scale-button));margin-top:12px" data-action="explain" ${state.explaining ? 'disabled' : ''}>${state.explaining === schedule.id ? 'The model is writing an explanation…' : state.config.configured ? 'Explain this week with your model' : 'Connect a model for a more detailed explanation'}</button>`}
   </div>
   <details class="meeting-list"><summary>View every selected section & meeting</summary><ul>${[...schedule.meetings].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || minute(a.start) - minute(b.start)).map(m => `<li>${e(m.day)} ${e(m.start)}–${e(m.end)} — ${e(m.courseId)} ${e(m.courseName)}, section ${e(m.sectionId)}</li>`).join('')}${schedule.selections.filter(selection => state.plan.courses.find(course => course.id === selection.courseId)?.sections.find(section => section.id === selection.sectionId)?.asynchronous).map(selection => `<li>${e(selection.courseId)}, section ${e(selection.sectionId)} — no fixed weekly meetings (asynchronous)</li>`).join('')}</ul></details>
   </section></div>${renderPlanDetails()}`;
@@ -273,14 +273,140 @@ function openExamples() {
   $('#example-options').innerHTML = state.examples.map((example, i) => `<button type="button" class="example-option" data-action="load-example" data-id="${e(example.id)}">${icon(['leaf', 'calendar', 'edit'][i])}<span><strong>${e(example.name)}</strong><small>${e(example.description)}</small></span><span class="arrow" aria-hidden="true">›</span></button>`).join('') || '<p class="notice notice-error">Examples could not be loaded. Check that the local server is running and refresh.</p>';
   $('#examples-dialog').showModal();
 }
+function renderProtocolOptions() {
+  const protocols = state.protocols.length ? state.protocols : [{ id: 'openai', name: 'OpenAI compatible' }];
+  $('#custom-protocol').innerHTML = protocols.map(item => `<option value="${e(item.id)}">${e(item.name)}</option>`).join('');
+}
+function closeSuggestions() {
+  $('#provider-panel').hidden = true; $('#provider-input').setAttribute('aria-expanded', 'false');
+  $('#model-panel').hidden = true; $('#model-name').setAttribute('aria-expanded', 'false');
+}
+function openSuggestions(input, panel, render) {
+  render();
+  panel.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+}
+function renderProviderOptions() {
+  const query = $('#provider-input').value.trim().toLowerCase();
+  const selected = providerById(state.provider);
+  const showAll = Boolean(selected) && query === selected.name.toLowerCase();
+  const matches = state.providers.filter(item => showAll || !query || item.name.toLowerCase().includes(query) || item.id.includes(query));
+  const groups = [['international', 'International'], ['china', 'China'], ['custom', 'Custom']];
+  const html = groups.map(([id, label]) => {
+    const items = matches.filter(item => item.group === id);
+    if (!items.length) return '';
+    return `<div class="combo-group"><p class="combo-group-title">${label}</p>${items.map(item => `<button type="button" class="combo-option${item.id === state.provider ? ' selected' : ''}" role="option" aria-selected="${item.id === state.provider}" data-action="pick-provider" data-id="${e(item.id)}">${e(item.name)}${item.note ? `<span class="combo-note">${e(item.note)}</span>` : ''}</button>`).join('')}</div>`;
+  }).join('');
+  $('#provider-list').innerHTML = html || '<p class="combo-empty">No provider matches what you typed.</p>';
+}
+function renderModelOptions() {
+  const query = $('#model-name').value.trim().toLowerCase();
+  const matches = state.models.filter(model => !query || model.toLowerCase().includes(query));
+  const shown = matches.slice(0, 200);
+  $('#model-list').innerHTML = shown.length
+    ? `${shown.map(model => `<button type="button" class="combo-option" role="option" data-action="pick-model" data-model="${e(model)}">${e(model)}</button>`).join('')}${matches.length > shown.length ? `<p class="combo-empty">Showing the first ${shown.length} of ${matches.length}. Keep typing to narrow the list.</p>` : ''}`
+    : (state.models.length ? '<p class="combo-empty">No model matches what you typed.</p>' : '');
+}
+function setStatus(text, kind = '') {
+  const status = $('#model-status');
+  status.textContent = text;
+  status.classList.toggle('error', kind === 'error');
+  status.classList.toggle('ok', kind === 'ok');
+}
+function setModel(value) {
+  $('#model-name').value = value || '';
+}
+function providerById(id) {
+  return state.providers.find(item => item.id === id) || null;
+}
+// Shows the provider's billing note as a chip right after the typed name,
+// mirroring how it appears in the dropdown. Hidden unless the field exactly
+// matches a provider name.
+let noteMeasureContext = null;
+function showProviderNote(provider) {
+  const noteEl = $('#provider-note');
+  const combo = $('#provider-combo');
+  const input = $('#provider-input');
+  if (provider && provider.note) {
+    noteEl.textContent = provider.note;
+    noteEl.hidden = false;
+    combo.classList.add('has-note');
+    noteMeasureContext = noteMeasureContext || document.createElement('canvas').getContext('2d');
+    const style = getComputedStyle(input);
+    noteMeasureContext.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const textWidth = noteMeasureContext.measureText(input.value).width;
+    noteEl.style.left = `${Math.round(parseFloat(style.paddingLeft) + textWidth + 8)}px`;
+  } else {
+    noteEl.hidden = true;
+    combo.classList.remove('has-note');
+  }
+}
+// Derives the note from whatever the field currently holds, so the chip can
+// never disagree with the visible name. Runs on every input and selection.
+function syncProviderNote() {
+  const value = $('#provider-input').value.trim().toLowerCase();
+  showProviderNote(state.providers.find(item => item.name.toLowerCase() === value) || null);
+}
+// The value the model field would hold without user typing: the saved model
+// when a key is configured, otherwise the provider default and nothing else.
+function modelFieldValue(provider) {
+  if (state.config.configured) return state.config.model || '';
+  return provider && provider.id === 'deepseek' ? 'deepseek-flash' : '';
+}
+function selectProvider(id) {
+  const provider = providerById(id);
+  if (!provider) return;
+  const previous = providerById(state.provider);
+  state.provider = provider.id;
+  state.models = [];
+  $('#provider-input').value = provider.name;
+  syncProviderNote();
+  $('#custom-fields').hidden = !provider.needsBaseUrl;
+  $('#get-models').hidden = Boolean(provider.needsBaseUrl);
+  $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : (provider.keyHint || `Enter your ${provider.name} API key`);
+  $('#model-name').placeholder = provider.defaultModel ? `e.g. ${provider.defaultModel}` : 'e.g. your-model-name';
+  // Typed model names survive a provider switch; only auto-filled values refresh.
+  const auto = previous ? modelFieldValue(previous) : '';
+  const input = $('#model-name');
+  if (input.value === '' || input.value === auto) input.value = modelFieldValue(provider);
+  renderModelOptions();
+  setStatus(provider.needsBaseUrl ? 'Type the model name for this custom endpoint.' : 'Press Get Model to load suggestions, or type the model name.');
+}
+async function checkModels() {
+  if (state.checking) return;
+  state.checking = true;
+  const button = $('#get-models');
+  button.disabled = true; button.textContent = 'Getting…';
+  $('#model-error').hidden = true;
+  setStatus('Loading models…');
+  try {
+    const output = await api('/api/models', { method: 'POST', body: { provider: state.provider, apiKey: $('#api-key').value, baseUrl: $('#custom-base-url').value, protocol: $('#custom-protocol').value } });
+    state.models = output.models || [];
+    setStatus(`${state.models.length} model${state.models.length === 1 ? '' : 's'} available from ${output.providerName}.`, 'ok');
+    renderModelOptions();
+    announce(`${output.providerName} returned ${state.models.length} models. Pick one, or type a model name.`);
+  } catch (error) {
+    setStatus(`${error.message} You can still type the model name.`, 'error');
+  } finally {
+    state.checking = false;
+    button.disabled = false; button.textContent = 'Get Model';
+  }
+}
 function openModel() {
   $('#api-key').value = '';
-  $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : 'Enter your DeepSeek API key';
-  $('#model-name').value = state.config.model || 'deepseek-flash';
+  const configured = state.config.provider || 'deepseek';
+  selectProvider(configured);
+  // The model field reflects saved settings only. Without a saved (or
+  // environment-provided) key there is nothing to show, except the provider
+  // default which is filled in as a convenience.
+  setModel(modelFieldValue(providerById(configured)));
+  $('#custom-base-url').value = state.config.baseUrl || '';
+  $('#custom-protocol').value = state.config.protocol || 'openai';
   $('#remember-key').checked = state.config.keySource === 'disk' || !state.config.configured;
   $('#key-help').textContent = state.config.configured ? `Key source: ${state.config.keySource === 'disk' ? 'saved on this device' : state.config.keySource === 'environment' ? 'environment variable' : 'current server session'}. The key itself is never returned to the browser.` : 'Your key is never returned to the browser or included in exports.';
   $('#forget-key').disabled = !state.config.configured;
   $('#model-error').hidden = true;
+  closeSuggestions();
   $('#model-dialog').showModal();
 }
 
@@ -299,7 +425,7 @@ async function parseForm() {
   state.input = $('#course-input').value;
   if (!state.input.trim()) throw new Error('Enter your courses and section times, or try an example.');
   if (!state.config.configured) { openModel(); return; }
-  state.busy = true; clearError(); render(); announce('DeepSeek is interpreting your courses and preferences.');
+  state.busy = true; clearError(); render(); announce(`${state.config.providerName || 'The model'} is interpreting your courses and preferences.`);
   try {
     applyGenerated(await api('/api/generate', { method: 'POST', body: { input: state.input } }));
     state.adjustment = '';
@@ -336,7 +462,7 @@ async function explainSchedule() {
   try {
     const output = await api('/api/explain', { method: 'POST', body: { confirmationId: state.confirmationId, scheduleId: schedule.id } });
     state.explanations[schedule.id] = output.explanation;
-    announce('DeepSeek commentary is ready.');
+    announce('Model commentary is ready.');
   } finally { state.explaining = null; render(); }
 }
 
@@ -366,6 +492,8 @@ async function action(button) {
     if (state.input.trim()) { openExamples(); return; }
     state.input = state.examples[0]?.input || ''; render(); $('#course-input').focus(); return;
   }
+  if (type === 'pick-provider') { selectProvider(button.dataset.id); closeSuggestions(); return; }
+  if (type === 'pick-model') { setModel(button.dataset.model); closeSuggestions(); return; }
   if (type === 'select-result') { state.selected = i; clearError(); render(); announce(`Option ${i + 1} selected. ${state.result.solutions[i].explanation}`); return; }
   if (type === 'focus-refinement') { $('#adjustment-input').focus(); $('#refinement-form').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   if (type === 'download') { downloadSchedule(); return; }
@@ -374,6 +502,7 @@ async function action(button) {
 }
 
 document.addEventListener('click', event => {
+  if (!event.target.closest('.combo')) closeSuggestions();
   const close = event.target.closest('[data-close]');
   if (close) document.getElementById(close.dataset.close).close();
   const button = event.target.closest('[data-action]');
@@ -404,6 +533,39 @@ document.addEventListener('submit', event => {
 
 $('#open-model').addEventListener('click', openModel);
 $('#model-icon').innerHTML = icon('sparkle');
+$('#provider-input').addEventListener('focus', () => {
+  // Focusing clears the field so the user retypes; blur restores the previous
+  // provider when the new text is not an exact match.
+  $('#provider-input').value = '';
+  syncProviderNote();
+  openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions);
+});
+$('#provider-input').addEventListener('input', () => { syncProviderNote(); openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions); });
+$('#provider-input').addEventListener('blur', () => {
+  const query = $('#provider-input').value.trim().toLowerCase();
+  const match = state.providers.find(item => item.name.toLowerCase() === query || item.id === query);
+  if (match) selectProvider(match.id);
+  else {
+    const current = providerById(state.provider);
+    if (current) { $('#provider-input').value = current.name; syncProviderNote(); }
+  }
+});
+$('#provider-input').addEventListener('keydown', event => {
+  if (event.key === 'Escape') { closeSuggestions(); return; }
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  const query = $('#provider-input').value.trim().toLowerCase();
+  const match = state.providers.find(item => item.name.toLowerCase() === query || item.id === query);
+  if (match) selectProvider(match.id);
+  closeSuggestions();
+});
+$('#model-name').addEventListener('focus', () => openSuggestions($('#model-name'), $('#model-panel'), renderModelOptions));
+$('#model-name').addEventListener('input', () => openSuggestions($('#model-name'), $('#model-panel'), renderModelOptions));
+$('#model-name').addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === 'Escape') { event.preventDefault(); closeSuggestions(); }
+});
+$('#get-models').addEventListener('click', () => checkModels());
+for (const panel of ['#provider-panel', '#model-panel']) $(panel).addEventListener('mousedown', event => event.preventDefault());
 $('#open-settings').addEventListener('click', openPreferences);
 $('#settings-icon').innerHTML = icon('settings');
 $('#open-about').addEventListener('click', () => $('#about-dialog').showModal());
@@ -421,8 +583,8 @@ $('#model-form').addEventListener('submit', async event => {
   event.preventDefault();
   const button = $('#save-model'); button.disabled = true; button.textContent = 'Saving…'; $('#model-error').hidden = true;
   try {
-    state.config = await api('/api/config', { method: 'PUT', body: { apiKey: $('#api-key').value, model: $('#model-name').value.trim(), rememberKey: $('#remember-key').checked } });
-    $('#api-key').value = ''; $('#model-dialog').close(); render(); announce('Model settings saved. The connection has not yet been tested; generate a timetable to use it.');
+    state.config = await api('/api/config', { method: 'PUT', body: { provider: state.provider, apiKey: $('#api-key').value, model: $('#model-name').value.trim(), rememberKey: $('#remember-key').checked, baseUrl: $('#custom-base-url').value, protocol: $('#custom-protocol').value } });
+    $('#api-key').value = ''; $('#model-dialog').close(); render(); announce(`${state.config.providerName || 'The model'} settings saved. The connection has not yet been tested; generate a timetable to use it.`);
   } catch (error) { $('#model-error').textContent = error.message; $('#model-error').hidden = false; }
   finally { button.disabled = false; button.textContent = 'Save key'; }
 });
@@ -431,7 +593,7 @@ $('#forget-key').addEventListener('click', async () => {
   try {
     state.config = await api('/api/config', { method: 'DELETE' });
     $('#api-key').value = ''; $('#model-dialog').close(); render();
-    announce(state.config.configured ? 'Saved key removed. An environment variable still provides a key; remove it from .env to disconnect completely.' : 'Saved key removed. DeepSeek is disconnected.');
+    announce(state.config.configured ? 'Saved key removed. An environment variable still provides a key; remove it from .env to disconnect completely.' : 'Saved key removed. The model is disconnected.');
   } catch (error) { $('#model-error').textContent = error.message; $('#model-error').hidden = false; }
   finally { $('#forget-key').disabled = !state.config.configured; }
 });
@@ -439,8 +601,13 @@ $('#forget-key').addEventListener('click', async () => {
 migrateLegacyFontSize();
 applyAllFontSizes();
 render();
-const initial = await Promise.allSettled([api('/api/config'), api('/api/examples')]);
-if (initial[0].status === 'fulfilled') state.config = initial[0].value;
+const initial = await Promise.allSettled([api('/api/config'), api('/api/examples'), api('/api/providers')]);
+if (initial[0].status === 'fulfilled') {
+  state.config = initial[0].value;
+  if (initial[0].value.provider) state.provider = initial[0].value.provider;
+}
 if (initial[1].status === 'fulfilled') state.examples = initial[1].value;
+if (initial[2].status === 'fulfilled') { state.providers = initial[2].value.providers || []; state.protocols = initial[2].value.protocols || []; }
+renderProtocolOptions();
 render();
 for (const result of initial) if (result.status === 'rejected') showError(result.reason);
