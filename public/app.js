@@ -28,6 +28,37 @@ const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">$
 const colorStyle = index => { const [bg, ink, border] = COLORS[index % COLORS.length]; return `--course-bg:${bg};--course-ink:${ink};--course-border:${border}`; };
 const minute = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
 const state = { step: 0, input: '', examples: [], config: { configured: false }, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
+const FONT_SCALES = { small: 0.9, medium: 1, large: 1.15, xlarge: 1.3 };
+const FONT_KEYS = ['small', 'medium', 'large', 'xlarge'];
+const FONT_LABELS = { small: 'Small', medium: 'Medium', large: 'Large', xlarge: 'Extra large' };
+const FONT_KEY_DEFAULT = 'medium';
+const FONT_STORAGE_KEY = 'coursefit.fontSize';
+const FONT_STORAGE_KEY_LEGACY = 'coursefit.fontScale';
+const FONT_GROUPS = ['button', 'title', 'other'];
+function readFontSettings() {
+  try { return JSON.parse(localStorage.getItem(FONT_STORAGE_KEY)) || {}; } catch { return {}; }
+}
+function applyFontSize(group, key) {
+  const scale = FONT_SCALES[key] ?? FONT_SCALES[FONT_KEY_DEFAULT];
+  document.documentElement.style.setProperty(`--font-scale-${group}`, String(scale));
+}
+function applyAllFontSizes() {
+  const saved = readFontSettings();
+  for (const group of FONT_GROUPS) applyFontSize(group, saved[group] ?? FONT_KEY_DEFAULT);
+}
+function migrateLegacyFontSize() {
+  const legacy = localStorage.getItem(FONT_STORAGE_KEY_LEGACY);
+  if (!legacy || localStorage.getItem(FONT_STORAGE_KEY)) return;
+  const key = FONT_KEYS.includes(legacy) ? legacy : FONT_KEY_DEFAULT;
+  const settings = {};
+  for (const group of FONT_GROUPS) settings[group] = key;
+  localStorage.setItem(FONT_STORAGE_KEY, JSON.stringify(settings));
+}
+function fontIndex(key) { const index = FONT_KEYS.indexOf(key); return index < 0 ? FONT_KEYS.indexOf(FONT_KEY_DEFAULT) : index; }
+function fontKeyAt(value) { return FONT_KEYS[Number(value)] ?? FONT_KEY_DEFAULT; }
+function updateFontSizeLabel(input) {
+  input.setAttribute('aria-valuetext', FONT_LABELS[fontKeyAt(input.value)]);
+}
 
 async function api(path, { method = 'GET', body } = {}) {
   let response;
@@ -52,7 +83,9 @@ function updateConnection() {
   const dot = $('#connection-dot');
   dot.classList.toggle('connected', state.config.configured);
   dot.setAttribute('aria-label', state.config.configured ? 'DeepSeek configured' : 'DeepSeek not configured');
-  $('#open-settings').setAttribute('aria-label', state.config.configured ? 'Settings, DeepSeek configured' : 'Settings, connect DeepSeek');
+  const modelLabel = $('#model-label');
+  modelLabel.textContent = state.config.configured ? state.config.model : 'Model';
+  $('#open-model').setAttribute('aria-label', state.config.configured ? `Model, DeepSeek configured (${state.config.model})` : 'Model, connect DeepSeek');
 }
 function renderSteps() {
   const titles = ['Your courses', 'A few details', 'Your timetable'];
@@ -81,7 +114,7 @@ function renderInput() {
       <div class="input-toolbar"><span>Include every lecture and tutorial in each section.</span><span id="character-count">${state.input.length.toLocaleString()} / 100,000</span></div>
       <div class="privacy-note">${icon('lock')}<span>Use course information only. Leave out personal details. Generating your timetable sends this text to DeepSeek; examples stay local.</span></div>
       <div class="form-actions"><button type="button" class="button button-secondary" data-action="examples" ${state.busy ? 'disabled' : ''}>${icon('calendar')}Try an example</button><button class="button button-primary" id="parse-button" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Reading your input…' : `Generate my timetable${icon('arrow')}`}</button></div>
-      <p class="field-help" style="margin-bottom:0;margin-top:16px">${state.config.configured ? `DeepSeek is configured (${e(state.config.model)}). A few questions if needed, then straight to your timetable.` : 'No API key yet? Try a pre-parsed example, or connect DeepSeek in Settings.'}</p>
+      <p class="field-help" style="margin-bottom:0;margin-top:16px">${state.config.configured ? `DeepSeek is configured (${e(state.config.model)}). A few questions if needed, then straight to your timetable.` : 'No API key yet? Try a pre-parsed example, or connect DeepSeek in Model.'}</p>
     </form>
     <aside class="input-aside">
       <section class="panel preview-panel" aria-label="Illustrative weekly timetable, not a generated result">
@@ -143,7 +176,7 @@ function renderRefinement() {
     <div class="panel-title"><h2>Fine-tune your timetable</h2><span class="pill">Keep the conversation going</span></div>
     <label for="adjustment-input">What would you like to change?</label>
     <div class="refinement-controls"><textarea id="adjustment-input" maxlength="2000" rows="2" required placeholder="e.g. Allow 09:00 classes, keep Friday free if possible, and leave 30 minutes between classes." ${state.busy ? 'disabled' : ''}>${e(state.adjustment)}</textarea><button type="submit" class="button button-primary" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Updating…' : `Update timetable${icon('arrow')}`}</button></div>
-    <p class="field-help">Changes apply directly. Everything else stays as it is. ${state.config.configured ? 'Uses DeepSeek.' : 'Connect DeepSeek in Settings to apply an adjustment.'}</p>
+    <p class="field-help">Changes apply directly. Everything else stays as it is. ${state.config.configured ? 'Uses DeepSeek.' : 'Connect DeepSeek in Model to apply an adjustment.'}</p>
   </form>`;
 }
 
@@ -200,7 +233,7 @@ function renderResults() {
   ${allHard ? `<ul class="preference-checks">${state.plan.hardConstraints.map(rule => `<li><span class="met">${icon('check')}</span><span>${e(describe(rule))}<span class="muted"> — required, met</span></span></li>`).join('')}</ul>` : ''}
   ${schedule.preferences.length ? `<ul class="preference-checks">${schedule.preferences.map(preference => `<li><span class="${preference.satisfied ? 'met' : 'missed'}">${icon(preference.satisfied ? 'check' : 'minus')}</span><span>${e(preference.label)}<span class="muted"> — ${preference.satisfied ? 'met' : 'not met'}</span></span></li>`).join('')}</ul>` : ''}
   <p style="line-height:1.8">${e(schedule.explanation)}</p>
-  ${explanation ? `<div class="ai-explanation"><span class="pill">${icon('sparkle')}DeepSeek commentary</span><p>${e(explanation)}</p><span class="field-help">The verified preference checks above remain the source of truth.</span></div>` : `<button type="button" class="text-button" style="font-size:11px;margin-top:12px" data-action="explain" ${state.explaining ? 'disabled' : ''}>${state.explaining === schedule.id ? 'DeepSeek is writing an explanation…' : state.config.configured ? 'Explain this week with DeepSeek' : 'Connect DeepSeek for a more detailed explanation'}</button>`}
+  ${explanation ? `<div class="ai-explanation"><span class="pill">${icon('sparkle')}DeepSeek commentary</span><p>${e(explanation)}</p><span class="field-help">The verified preference checks above remain the source of truth.</span></div>` : `<button type="button" class="text-button" style="font-size:calc(0.733rem * var(--font-scale-button));margin-top:12px" data-action="explain" ${state.explaining ? 'disabled' : ''}>${state.explaining === schedule.id ? 'DeepSeek is writing an explanation…' : state.config.configured ? 'Explain this week with DeepSeek' : 'Connect DeepSeek for a more detailed explanation'}</button>`}
   </div>
   <details class="meeting-list"><summary>View every selected section & meeting</summary><ul>${[...schedule.meetings].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || minute(a.start) - minute(b.start)).map(m => `<li>${e(m.day)} ${e(m.start)}–${e(m.end)} — ${e(m.courseId)} ${e(m.courseName)}, section ${e(m.sectionId)}</li>`).join('')}${schedule.selections.filter(selection => state.plan.courses.find(course => course.id === selection.courseId)?.sections.find(section => section.id === selection.sectionId)?.asynchronous).map(selection => `<li>${e(selection.courseId)}, section ${e(selection.sectionId)} — no fixed weekly meetings (asynchronous)</li>`).join('')}</ul></details>
   </section></div>${renderPlanDetails()}`;
@@ -240,22 +273,32 @@ function openExamples() {
   $('#example-options').innerHTML = state.examples.map((example, i) => `<button type="button" class="example-option" data-action="load-example" data-id="${e(example.id)}">${icon(['leaf', 'calendar', 'edit'][i])}<span><strong>${e(example.name)}</strong><small>${e(example.description)}</small></span><span class="arrow" aria-hidden="true">›</span></button>`).join('') || '<p class="notice notice-error">Examples could not be loaded. Check that the local server is running and refresh.</p>';
   $('#examples-dialog').showModal();
 }
-function openSettings() {
+function openModel() {
   $('#api-key').value = '';
   $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : 'Enter your DeepSeek API key';
   $('#model-name').value = state.config.model || 'deepseek-flash';
   $('#remember-key').checked = state.config.keySource === 'disk' || !state.config.configured;
   $('#key-help').textContent = state.config.configured ? `Key source: ${state.config.keySource === 'disk' ? 'saved on this device' : state.config.keySource === 'environment' ? 'environment variable' : 'current server session'}. The key itself is never returned to the browser.` : 'Your key is never returned to the browser or included in exports.';
   $('#forget-key').disabled = !state.config.configured;
-  $('#settings-error').hidden = true;
-  $('#settings-dialog').showModal();
+  $('#model-error').hidden = true;
+  $('#model-dialog').showModal();
+}
+
+function openPreferences() {
+  const saved = readFontSettings();
+  for (const group of FONT_GROUPS) {
+    const input = $(`#font-size-${group}`);
+    input.value = String(fontIndex(saved[group] ?? FONT_KEY_DEFAULT));
+    updateFontSizeLabel(input);
+  }
+  $('#preferences-dialog').showModal();
 }
 
 async function parseForm() {
   if (state.busy) return;
   state.input = $('#course-input').value;
   if (!state.input.trim()) throw new Error('Enter your courses and section times, or try an example.');
-  if (!state.config.configured) { openSettings(); return; }
+  if (!state.config.configured) { openModel(); return; }
   state.busy = true; clearError(); render(); announce('DeepSeek is interpreting your courses and preferences.');
   try {
     applyGenerated(await api('/api/generate', { method: 'POST', body: { input: state.input } }));
@@ -266,7 +309,7 @@ async function parseForm() {
 async function solveForm() {
   if (state.busy) return;
   const hasAnswers = Object.values(state.resolutions).some(answer => answer.trim());
-  if (hasAnswers && !state.config.configured) { openSettings(); return; }
+  if (hasAnswers && !state.config.configured) { openModel(); return; }
   state.busy = true; clearError(); render(); announce('Applying your answers and generating your timetable.');
   try {
     applyGenerated(await api('/api/generate', { method: 'POST', body: { draftId: state.draft.id, answers: state.resolutions } }));
@@ -277,7 +320,7 @@ async function refineForm() {
   if (state.busy) return;
   state.adjustment = $('#adjustment-input').value;
   if (!state.adjustment.trim()) return;
-  if (!state.config.configured) { openSettings(); return; }
+  if (!state.config.configured) { openModel(); return; }
   state.busy = true; clearError(); render(); announce('Updating your timetable from your adjustment.');
   try {
     applyGenerated(await api('/api/generate', { method: 'POST', body: { draftId: state.draft.id, adjustment: state.adjustment } }));
@@ -286,7 +329,7 @@ async function refineForm() {
 }
 
 async function explainSchedule() {
-  if (!state.config.configured) { openSettings(); return; }
+  if (!state.config.configured) { openModel(); return; }
   if (state.explaining) return;
   const schedule = state.result.solutions[state.selected];
   state.explaining = schedule.id; render();
@@ -359,28 +402,42 @@ document.addEventListener('submit', event => {
   if (event.target.id === 'refinement-form') { event.preventDefault(); refineForm().catch(showError); }
 });
 
-$('#open-settings').addEventListener('click', openSettings);
+$('#open-model').addEventListener('click', openModel);
+$('#model-icon').innerHTML = icon('sparkle');
+$('#open-settings').addEventListener('click', openPreferences);
 $('#settings-icon').innerHTML = icon('settings');
 $('#open-about').addEventListener('click', () => $('#about-dialog').showModal());
-$('#settings-form').addEventListener('submit', async event => {
+for (const group of FONT_GROUPS) {
+  $(`#font-size-${group}`).addEventListener('input', event => {
+    const key = fontKeyAt(event.target.value);
+    applyFontSize(group, key);
+    const settings = readFontSettings();
+    settings[group] = key;
+    localStorage.setItem(FONT_STORAGE_KEY, JSON.stringify(settings));
+    updateFontSizeLabel(event.target);
+  });
+}
+$('#model-form').addEventListener('submit', async event => {
   event.preventDefault();
-  const button = $('#save-settings'); button.disabled = true; button.textContent = 'Saving…'; $('#settings-error').hidden = true;
+  const button = $('#save-model'); button.disabled = true; button.textContent = 'Saving…'; $('#model-error').hidden = true;
   try {
     state.config = await api('/api/config', { method: 'PUT', body: { apiKey: $('#api-key').value, model: $('#model-name').value.trim(), rememberKey: $('#remember-key').checked } });
-    $('#api-key').value = ''; $('#settings-dialog').close(); render(); announce('DeepSeek settings saved. The connection has not yet been tested; generate a timetable to use it.');
-  } catch (error) { $('#settings-error').textContent = error.message; $('#settings-error').hidden = false; }
-  finally { button.disabled = false; button.textContent = 'Save settings'; }
+    $('#api-key').value = ''; $('#model-dialog').close(); render(); announce('Model settings saved. The connection has not yet been tested; generate a timetable to use it.');
+  } catch (error) { $('#model-error').textContent = error.message; $('#model-error').hidden = false; }
+  finally { button.disabled = false; button.textContent = 'Save key'; }
 });
 $('#forget-key').addEventListener('click', async () => {
   $('#forget-key').disabled = true;
   try {
     state.config = await api('/api/config', { method: 'DELETE' });
-    $('#api-key').value = ''; $('#settings-dialog').close(); render();
+    $('#api-key').value = ''; $('#model-dialog').close(); render();
     announce(state.config.configured ? 'Saved key removed. An environment variable still provides a key; remove it from .env to disconnect completely.' : 'Saved key removed. DeepSeek is disconnected.');
-  } catch (error) { $('#settings-error').textContent = error.message; $('#settings-error').hidden = false; }
+  } catch (error) { $('#model-error').textContent = error.message; $('#model-error').hidden = false; }
   finally { $('#forget-key').disabled = !state.config.configured; }
 });
 
+migrateLegacyFontSize();
+applyAllFontSizes();
 render();
 const initial = await Promise.allSettled([api('/api/config'), api('/api/examples')]);
 if (initial[0].status === 'fulfilled') state.config = initial[0].value;

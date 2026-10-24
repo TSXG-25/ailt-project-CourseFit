@@ -16,7 +16,7 @@
     <div class="header-inner">
       <a class="brand" href="/" aria-label="CourseFit home"><img src="/favicon.svg" width="38" height="38" alt=""><span>Course<span class="brand-light">Fit</span></span></a>
       <div class="header-divider"></div><span class="workspace-name">Semester planner</span>
-      <div class="header-actions"><span class="local-badge"><span class="status-dot"></span>Local workspace</span><button class="button button-quiet" id="open-settings" type="button"><span id="settings-icon" aria-hidden="true"></span>Settings<span id="connection-dot" class="connection-dot" aria-label="Not connected"></span></button></div>
+      <div class="header-actions"><span class="local-badge"><span class="status-dot"></span>Local workspace</span><button class="button button-quiet" id="open-model" type="button"><span id="model-icon" aria-hidden="true"></span><span id="model-label">Model</span><span id="connection-dot" class="connection-dot" aria-label="Not connected"></span></button><button class="button button-quiet" id="open-settings" type="button"><span id="settings-icon" aria-hidden="true"></span>Settings</button></div>
     </div>
   </header>
   <main id="main-content" class="workspace">
@@ -27,19 +27,40 @@
   <footer class="site-footer"><span class="footer-brand">A little planning. A better semester.</span><span>Based on your section data. Availability and registration are not checked.</span><button type="button" class="text-button" id="open-about">How CourseFit works</button></footer>
   <div id="status" class="sr-only" role="status" aria-live="polite"></div>
 
-  <dialog id="settings-dialog" aria-labelledby="settings-title">
-    <div class="dialog-heading"><div><span class="dialog-symbol" id="settings-symbol" aria-hidden="true"></span><h2 id="settings-title">Connect DeepSeek</h2></div><button class="icon-button" data-close="settings-dialog" type="button" aria-label="Close settings">×</button></div>
+  <dialog id="model-dialog" aria-labelledby="model-title">
+    <div class="dialog-heading"><div><span class="dialog-symbol" id="model-symbol" aria-hidden="true"></span><h2 id="model-title">Connect DeepSeek</h2></div><button class="icon-button" data-close="model-dialog" type="button" aria-label="Close model settings">×</button></div>
     <p class="muted">Your key connects the language step. Timetable solving runs on your computer.</p>
-    <form id="settings-form">
+    <form id="model-form">
       <label for="api-key">DeepSeek API key</label>
       <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your API key">
       <p id="key-help" class="field-help">Your key is never returned to the browser or included in exports.</p>
       <label for="model-name">Model</label><input id="model-name" value="deepseek-flash" required maxlength="80" pattern="[a-zA-Z0-9._\-]+" spellcheck="false">
       <label class="checkbox-label"><input id="remember-key" type="checkbox" checked><span>Remember the key on this device<span class="field-help">Saved in a local file with owner-only permissions, excluded from Git. Uncheck to keep it for this server session only.</span></span></label>
-      <div id="settings-error" class="notice notice-error" role="alert" hidden></div>
-      <div class="dialog-actions"><button class="button button-danger-quiet" id="forget-key" type="button">Forget saved key</button><button class="button button-primary" id="save-settings" type="submit">Save settings</button></div>
+      <div id="model-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-actions"><button class="button button-danger-quiet" id="forget-key" type="button">Forget saved key</button><button class="button button-primary" id="save-model" type="submit">Save key</button></div>
     </form>
     <p class="settings-note">Parsing sends your course text to DeepSeek. Keep names, student IDs, emails and other personal information out of your input.</p>
+  </dialog>
+
+  <dialog id="preferences-dialog" aria-labelledby="preferences-title">
+    <div class="dialog-heading"><h2 id="preferences-title">Settings</h2><button class="icon-button" data-close="preferences-dialog" type="button" aria-label="Close settings">×</button></div>
+    <p class="muted">Adjust how CourseFit looks in this browser. Changes apply immediately.</p>
+    <div class="font-size-group">
+      <label for="font-size-button">Buttons</label>
+      <input class="font-size-slider" id="font-size-button" type="range" min="0" max="3" step="1" value="1" aria-label="Button text size">
+      <div class="font-size-tiers" aria-hidden="true"><span>Small</span><span>Medium</span><span>Large</span><span>Extra large</span></div>
+    </div>
+    <div class="font-size-group">
+      <label for="font-size-title">Titles</label>
+      <input class="font-size-slider" id="font-size-title" type="range" min="0" max="3" step="1" value="1" aria-label="Title text size">
+      <div class="font-size-tiers" aria-hidden="true"><span>Small</span><span>Medium</span><span>Large</span><span>Extra large</span></div>
+    </div>
+    <div class="font-size-group">
+      <label for="font-size-other">Other text</label>
+      <input class="font-size-slider" id="font-size-other" type="range" min="0" max="3" step="1" value="1" aria-label="Other text size">
+      <div class="font-size-tiers" aria-hidden="true"><span>Small</span><span>Medium</span><span>Large</span><span>Extra large</span></div>
+    </div>
+    <p class="settings-note">Saved on this device in your browser storage. Printing always uses a smaller fixed size.</p>
   </dialog>
 
   <dialog id="examples-dialog" aria-labelledby="examples-title">

@@ -8,5 +8,6 @@ CourseFit is a semester planning workspace. The central visual is the weekly gri
 - Character: the product mark is a small calendar with fitted course blocks. A precise, quiet interface leaves color for courses and status. Flat surfaces, restrained borders, rounded controls, no ornamental gradients.
 - Interaction: ask at most five consolidated questions once; answers generate directly. No confirmation checkbox or required second review. Keep interpreted courses/source available in collapsed details and show every preference's exact result. Let students fine-tune directly from successful, infeasible and incomplete-data results.
 - Accessibility: visible focus, native form labels and dialog behavior, live status/errors, reduced-motion support, 44px touch targets, and a scrollable calendar plus a text meeting list on narrow screens.
+- Font size: three independent sliders in Settings (**Buttons**, **Titles**, **Other text**), so students can enlarge control labels without inflating headings, or the reverse. See [Font size control](font-size-control.md).
 
 The UI/UX search suggested a product-demo landing pattern. This was rejected because the proposal calls for a working local application; the workspace opens directly into course input instead.
