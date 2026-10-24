@@ -45,9 +45,21 @@
   <dialog id="preferences-dialog" aria-labelledby="preferences-title">
     <div class="dialog-heading"><h2 id="preferences-title">Settings</h2><button class="icon-button" data-close="preferences-dialog" type="button" aria-label="Close settings">×</button></div>
     <p class="muted">Adjust how CourseFit looks in this browser. Changes apply immediately.</p>
-    <label for="font-size">Font size</label>
-    <input id="font-size" type="range" min="0" max="3" step="1" value="1" aria-label="Interface font size">
-    <div class="font-size-tiers" aria-hidden="true"><span>Small</span><span>Medium</span><span>Large</span><span>Extra large</span></div>
+    <div class="font-size-group">
+      <label for="font-size-button">Buttons</label>
+      <input class="font-size-slider" id="font-size-button" type="range" min="0" max="3" step="1" value="1" aria-label="Button text size">
+      <div class="font-size-tiers" aria-hidden="true"><span>Small</span><span>Medium</span><span>Large</span><span>Extra large</span></div>
+    </div>
+    <div class="font-size-group">
+      <label for="font-size-title">Titles</label>
+      <input class="font-size-slider" id="font-size-title" type="range" min="0" max="3" step="1" value="1" aria-label="Title text size">
+      <div class="font-size-tiers" aria-hidden="true"><span>Small</span><span>Medium</span><span>Large</span><span>Extra large</span></div>
+    </div>
+    <div class="font-size-group">
+      <label for="font-size-other">Other text</label>
+      <input class="font-size-slider" id="font-size-other" type="range" min="0" max="3" step="1" value="1" aria-label="Other text size">
+      <div class="font-size-tiers" aria-hidden="true"><span>Small</span><span>Medium</span><span>Large</span><span>Extra large</span></div>
+    </div>
     <p class="settings-note">Saved on this device in your browser storage. Printing always uses a smaller fixed size.</p>
   </dialog>
 

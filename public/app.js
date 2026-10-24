@@ -32,17 +32,32 @@ const FONT_SCALES = { small: 0.9, medium: 1, large: 1.15, xlarge: 1.3 };
 const FONT_KEYS = ['small', 'medium', 'large', 'xlarge'];
 const FONT_LABELS = { small: 'Small', medium: 'Medium', large: 'Large', xlarge: 'Extra large' };
 const FONT_KEY_DEFAULT = 'medium';
-const FONT_STORAGE_KEY = 'coursefit.fontScale';
-function applyFontSize(key) {
-  const scale = FONT_SCALES[key] ?? FONT_SCALES[FONT_KEY_DEFAULT];
-  document.documentElement.style.setProperty('--font-scale', String(scale));
+const FONT_STORAGE_KEY = 'coursefit.fontSize';
+const FONT_STORAGE_KEY_LEGACY = 'coursefit.fontScale';
+const FONT_GROUPS = ['button', 'title', 'other'];
+function readFontSettings() {
+  try { return JSON.parse(localStorage.getItem(FONT_STORAGE_KEY)) || {}; } catch { return {}; }
 }
-function savedFontKey() { return localStorage.getItem(FONT_STORAGE_KEY) || FONT_KEY_DEFAULT; }
+function applyFontSize(group, key) {
+  const scale = FONT_SCALES[key] ?? FONT_SCALES[FONT_KEY_DEFAULT];
+  document.documentElement.style.setProperty(`--font-scale-${group}`, String(scale));
+}
+function applyAllFontSizes() {
+  const saved = readFontSettings();
+  for (const group of FONT_GROUPS) applyFontSize(group, saved[group] ?? FONT_KEY_DEFAULT);
+}
+function migrateLegacyFontSize() {
+  const legacy = localStorage.getItem(FONT_STORAGE_KEY_LEGACY);
+  if (!legacy || localStorage.getItem(FONT_STORAGE_KEY)) return;
+  const key = FONT_KEYS.includes(legacy) ? legacy : FONT_KEY_DEFAULT;
+  const settings = {};
+  for (const group of FONT_GROUPS) settings[group] = key;
+  localStorage.setItem(FONT_STORAGE_KEY, JSON.stringify(settings));
+}
 function fontIndex(key) { const index = FONT_KEYS.indexOf(key); return index < 0 ? FONT_KEYS.indexOf(FONT_KEY_DEFAULT) : index; }
 function fontKeyAt(value) { return FONT_KEYS[Number(value)] ?? FONT_KEY_DEFAULT; }
-function updateFontSizeLabel() {
-  const key = fontKeyAt($('#font-size').value);
-  $('#font-size').setAttribute('aria-valuetext', FONT_LABELS[key]);
+function updateFontSizeLabel(input) {
+  input.setAttribute('aria-valuetext', FONT_LABELS[fontKeyAt(input.value)]);
 }
 
 async function api(path, { method = 'GET', body } = {}) {
@@ -216,7 +231,7 @@ function renderResults() {
   ${allHard ? `<ul class="preference-checks">${state.plan.hardConstraints.map(rule => `<li><span class="met">${icon('check')}</span><span>${e(describe(rule))}<span class="muted"> — required, met</span></span></li>`).join('')}</ul>` : ''}
   ${schedule.preferences.length ? `<ul class="preference-checks">${schedule.preferences.map(preference => `<li><span class="${preference.satisfied ? 'met' : 'missed'}">${icon(preference.satisfied ? 'check' : 'minus')}</span><span>${e(preference.label)}<span class="muted"> — ${preference.satisfied ? 'met' : 'not met'}</span></span></li>`).join('')}</ul>` : ''}
   <p style="line-height:1.8">${e(schedule.explanation)}</p>
-  ${explanation ? `<div class="ai-explanation"><span class="pill">${icon('sparkle')}DeepSeek commentary</span><p>${e(explanation)}</p><span class="field-help">The verified preference checks above remain the source of truth.</span></div>` : `<button type="button" class="text-button" style="font-size:0.733rem;margin-top:12px" data-action="explain" ${state.explaining ? 'disabled' : ''}>${state.explaining === schedule.id ? 'DeepSeek is writing an explanation…' : state.config.configured ? 'Explain this week with DeepSeek' : 'Connect DeepSeek for a more detailed explanation'}</button>`}
+  ${explanation ? `<div class="ai-explanation"><span class="pill">${icon('sparkle')}DeepSeek commentary</span><p>${e(explanation)}</p><span class="field-help">The verified preference checks above remain the source of truth.</span></div>` : `<button type="button" class="text-button" style="font-size:calc(0.733rem * var(--font-scale-button));margin-top:12px" data-action="explain" ${state.explaining ? 'disabled' : ''}>${state.explaining === schedule.id ? 'DeepSeek is writing an explanation…' : state.config.configured ? 'Explain this week with DeepSeek' : 'Connect DeepSeek for a more detailed explanation'}</button>`}
   </div>
   <details class="meeting-list"><summary>View every selected section & meeting</summary><ul>${[...schedule.meetings].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || minute(a.start) - minute(b.start)).map(m => `<li>${e(m.day)} ${e(m.start)}–${e(m.end)} — ${e(m.courseId)} ${e(m.courseName)}, section ${e(m.sectionId)}</li>`).join('')}${schedule.selections.filter(selection => state.plan.courses.find(course => course.id === selection.courseId)?.sections.find(section => section.id === selection.sectionId)?.asynchronous).map(selection => `<li>${e(selection.courseId)}, section ${e(selection.sectionId)} — no fixed weekly meetings (asynchronous)</li>`).join('')}</ul></details>
   </section></div>${renderPlanDetails()}`;
@@ -268,8 +283,12 @@ function openModel() {
 }
 
 function openPreferences() {
-  $('#font-size').value = String(fontIndex(savedFontKey()));
-  updateFontSizeLabel();
+  const saved = readFontSettings();
+  for (const group of FONT_GROUPS) {
+    const input = $(`#font-size-${group}`);
+    input.value = String(fontIndex(saved[group] ?? FONT_KEY_DEFAULT));
+    updateFontSizeLabel(input);
+  }
   $('#preferences-dialog').showModal();
 }
 
@@ -386,12 +405,16 @@ $('#model-icon').innerHTML = icon('sparkle');
 $('#open-settings').addEventListener('click', openPreferences);
 $('#settings-icon').innerHTML = icon('settings');
 $('#open-about').addEventListener('click', () => $('#about-dialog').showModal());
-$('#font-size').addEventListener('input', event => {
-  const key = fontKeyAt(event.target.value);
-  applyFontSize(key);
-  localStorage.setItem(FONT_STORAGE_KEY, key);
-  updateFontSizeLabel();
-});
+for (const group of FONT_GROUPS) {
+  $(`#font-size-${group}`).addEventListener('input', event => {
+    const key = fontKeyAt(event.target.value);
+    applyFontSize(group, key);
+    const settings = readFontSettings();
+    settings[group] = key;
+    localStorage.setItem(FONT_STORAGE_KEY, JSON.stringify(settings));
+    updateFontSizeLabel(event.target);
+  });
+}
 $('#model-form').addEventListener('submit', async event => {
   event.preventDefault();
   const button = $('#save-model'); button.disabled = true; button.textContent = 'Saving…'; $('#model-error').hidden = true;
@@ -411,7 +434,8 @@ $('#forget-key').addEventListener('click', async () => {
   finally { $('#forget-key').disabled = !state.config.configured; }
 });
 
-applyFontSize(savedFontKey());
+migrateLegacyFontSize();
+applyAllFontSizes();
 render();
 const initial = await Promise.allSettled([api('/api/config'), api('/api/examples')]);
 if (initial[0].status === 'fulfilled') state.config = initial[0].value;
