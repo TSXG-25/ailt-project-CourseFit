@@ -271,17 +271,12 @@
   dialog > .muted { font-size: calc(0.867rem * var(--font-scale-other)); line-height: 1.8; margin-bottom: 24px; }
   #model-form > label { margin-top: 18px; }
   #model-form > .checkbox-label { margin-top: 24px; }
-  .model-row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
-  .model-combo-cell { flex: 1 1 240px; min-width: 0; }
-  .model-check-cell { flex: 0 1 auto; display: flex; flex-direction: column; gap: 7px; }
-  .model-check-cell .field-help { margin: 0; max-width: 210px; }
+  .key-row { display: flex; gap: 10px; align-items: stretch; }
+  .key-row input { flex: 1 1 auto; min-width: 0; }
+  .key-row .button { flex-shrink: 0; white-space: nowrap; }
   .combo { position: relative; }
-  .combo-button { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid #ccd4e4; border-radius: 8px; color: var(--ink); font-size: calc(0.867rem * var(--font-scale-other)); font-weight: 550; text-align: left; }
-  .combo-button:hover { border-color: #b2c1ec; }
-  .combo-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .combo-caret { color: var(--muted); flex-shrink: 0; }
+  .combo-input { width: 100%; }
   .combo-panel { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; right: 0; padding: 10px; background: #fff; border: 1px solid #ccd4e4; border-radius: 10px; box-shadow: 0 12px 28px #1d294214; }
-  .combo-search { min-height: 38px; margin-bottom: 8px; }
   .combo-list { max-height: 244px; overflow-y: auto; }
   .combo-group + .combo-group { margin-top: 8px; }
   .combo-group-title { margin: 0; padding: 6px 8px; color: var(--muted); font-size: calc(0.667rem * var(--font-scale-other)); font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }

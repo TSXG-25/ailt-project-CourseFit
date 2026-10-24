@@ -277,45 +277,38 @@ function renderProtocolOptions() {
   const protocols = state.protocols.length ? state.protocols : [{ id: 'openai', name: 'OpenAI compatible' }];
   $('#custom-protocol').innerHTML = protocols.map(item => `<option value="${e(item.id)}">${e(item.name)}</option>`).join('');
 }
-function closeCombos() {
-  $('#provider-panel').hidden = true; $('#provider-button').setAttribute('aria-expanded', 'false');
-  $('#model-panel').hidden = true; $('#model-button').setAttribute('aria-expanded', 'false');
+function closeSuggestions() {
+  $('#provider-panel').hidden = true; $('#provider-input').setAttribute('aria-expanded', 'false');
+  $('#model-panel').hidden = true; $('#model-name').setAttribute('aria-expanded', 'false');
 }
-function toggleCombo(buttonId, panelId, searchId) {
-  const panel = $(panelId);
-  const opening = panel.hidden;
-  closeCombos();
-  panel.hidden = !opening;
-  $(buttonId).setAttribute('aria-expanded', String(opening));
-  if (!opening) return;
-  $(searchId).value = '';
-  state.providerQuery = ''; state.modelQuery = '';
-  renderProviderOptions();
-  renderModelOptions();
-  $(searchId).focus();
+function openSuggestions(input, panel, render) {
+  render();
+  panel.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
 }
 function renderProviderOptions() {
-  const query = String(state.providerQuery || '').trim().toLowerCase();
-  const matches = state.providers.filter(item => !query || item.name.toLowerCase().includes(query) || item.id.includes(query));
+  const query = $('#provider-input').value.trim().toLowerCase();
+  const selected = providerById(state.provider);
+  const showAll = Boolean(selected) && query === selected.name.toLowerCase();
+  const matches = state.providers.filter(item => showAll || !query || item.name.toLowerCase().includes(query) || item.id.includes(query));
   const groups = [['international', 'International'], ['china', 'China'], ['custom', 'Custom']];
   const html = groups.map(([id, label]) => {
     const items = matches.filter(item => item.group === id);
     if (!items.length) return '';
     return `<div class="combo-group"><p class="combo-group-title">${label}</p>${items.map(item => `<button type="button" class="combo-option${item.id === state.provider ? ' selected' : ''}" role="option" aria-selected="${item.id === state.provider}" data-action="pick-provider" data-id="${e(item.id)}">${e(item.name)}${item.note ? `<span class="combo-note">${e(item.note)}</span>` : ''}</button>`).join('')}</div>`;
   }).join('');
-  $('#provider-list').innerHTML = html || '<p class="combo-empty">No provider matches your search.</p>';
+  $('#provider-list').innerHTML = html || '<p class="combo-empty">No provider matches what you typed.</p>';
 }
 function renderModelOptions() {
-  const query = String(state.modelQuery || '').trim().toLowerCase();
+  const query = $('#model-name').value.trim().toLowerCase();
   const matches = state.models.filter(model => !query || model.toLowerCase().includes(query));
   const shown = matches.slice(0, 200);
   $('#model-list').innerHTML = shown.length
-    ? `${shown.map(model => `<button type="button" class="combo-option${model === $('#model-name').value ? ' selected' : ''}" role="option" data-action="pick-model" data-model="${e(model)}">${e(model)}</button>`).join('')}${matches.length > shown.length ? `<p class="combo-empty">Showing the first ${shown.length} of ${matches.length}. Search to narrow the list.</p>` : ''}`
-    : `<p class="combo-empty">${state.models.length ? 'No model matches your search.' : 'Press “Check available models” to load the list, or type the model name below.'}</p>`;
+    ? `${shown.map(model => `<button type="button" class="combo-option" role="option" data-action="pick-model" data-model="${e(model)}">${e(model)}</button>`).join('')}${matches.length > shown.length ? `<p class="combo-empty">Showing the first ${shown.length} of ${matches.length}. Keep typing to narrow the list.</p>` : ''}`
+    : `<p class="combo-empty">${state.models.length ? 'No model matches what you typed.' : 'Press Get Model to load suggestions, or type the model name.'}</p>`;
 }
 function setModel(value) {
   $('#model-name').value = value || '';
-  $('#model-value').textContent = value || 'Select a model';
 }
 function providerById(id) {
   return state.providers.find(item => item.id === id) || null;
@@ -325,31 +318,31 @@ function selectProvider(id) {
   if (!provider) return;
   state.provider = provider.id;
   state.models = [];
-  $('#provider-value').textContent = provider.name;
+  $('#provider-input').value = provider.name;
   $('#custom-fields').hidden = !provider.needsBaseUrl;
+  $('#get-models').hidden = Boolean(provider.needsBaseUrl);
+  $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : `Enter your ${provider.name} API key`;
   setModel(provider.defaultModel || '');
-  $('#model-count').textContent = 'Uses your key to list models. Listing is free; it does not spend tokens.';
-  renderModelOptions();
+  $('#model-count').textContent = 'Type the model name, or press Get Model to load suggestions.';
 }
 async function checkModels() {
   if (state.checking) return;
   state.checking = true;
-  const button = $('#check-models');
-  button.disabled = true; button.textContent = 'Checking…';
+  const button = $('#get-models');
+  button.disabled = true; button.textContent = 'Getting…';
   $('#model-error').hidden = true;
   try {
     const output = await api('/api/models', { method: 'POST', body: { provider: state.provider, apiKey: $('#api-key').value, baseUrl: $('#custom-base-url').value, protocol: $('#custom-protocol').value } });
     state.models = output.models || [];
-    $('#model-count').textContent = `${state.models.length} model${state.models.length === 1 ? '' : 's'} available from ${output.providerName}.`;
-    renderModelOptions();
+    $('#model-count').textContent = `${state.models.length} model${state.models.length === 1 ? '' : 's'} available from ${output.providerName}. Suggestions appear when the Model field is focused.`;
     announce(`${output.providerName} returned ${state.models.length} models. Pick one, or type a model name.`);
   } catch (error) {
-    $('#model-error').textContent = `${error.message} You can still type the model name below.`;
+    $('#model-error').textContent = `${error.message} You can still type the model name.`;
     $('#model-error').hidden = false;
-    $('#model-count').textContent = 'Listing failed. Type the model name below.';
+    $('#model-count').textContent = 'Listing failed. Type the model name instead.';
   } finally {
     state.checking = false;
-    button.disabled = false; button.textContent = 'Check available models';
+    button.disabled = false; button.textContent = 'Get Model';
   }
 }
 function openModel() {
@@ -365,7 +358,7 @@ function openModel() {
   $('#key-help').textContent = state.config.configured ? `Key source: ${state.config.keySource === 'disk' ? 'saved on this device' : state.config.keySource === 'environment' ? 'environment variable' : 'current server session'}. The key itself is never returned to the browser.` : 'Your key is never returned to the browser or included in exports.';
   $('#forget-key').disabled = !state.config.configured;
   $('#model-error').hidden = true;
-  closeCombos();
+  closeSuggestions();
   $('#model-dialog').showModal();
 }
 
@@ -451,8 +444,8 @@ async function action(button) {
     if (state.input.trim()) { openExamples(); return; }
     state.input = state.examples[0]?.input || ''; render(); $('#course-input').focus(); return;
   }
-  if (type === 'pick-provider') { selectProvider(button.dataset.id); closeCombos(); return; }
-  if (type === 'pick-model') { setModel(button.dataset.model); closeCombos(); return; }
+  if (type === 'pick-provider') { selectProvider(button.dataset.id); closeSuggestions(); return; }
+  if (type === 'pick-model') { setModel(button.dataset.model); closeSuggestions(); return; }
   if (type === 'select-result') { state.selected = i; clearError(); render(); announce(`Option ${i + 1} selected. ${state.result.solutions[i].explanation}`); return; }
   if (type === 'focus-refinement') { $('#adjustment-input').focus(); $('#refinement-form').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   if (type === 'download') { downloadSchedule(); return; }
@@ -461,7 +454,7 @@ async function action(button) {
 }
 
 document.addEventListener('click', event => {
-  if (!event.target.closest('.combo')) closeCombos();
+  if (!event.target.closest('.combo')) closeSuggestions();
   const close = event.target.closest('[data-close]');
   if (close) document.getElementById(close.dataset.close).close();
   const button = event.target.closest('[data-action]');
@@ -481,9 +474,6 @@ document.addEventListener('input', event => {
     }
   }
   if (target.id === 'adjustment-input') state.adjustment = target.value;
-  if (target.id === 'provider-search') { state.providerQuery = target.value; renderProviderOptions(); }
-  if (target.id === 'model-search') { state.modelQuery = target.value; renderModelOptions(); }
-  if (target.id === 'model-name') $('#model-value').textContent = target.value || 'Select a model';
   if (target.dataset.question !== undefined) state.resolutions[state.draft.data.clarifications[Number(target.dataset.question)]] = target.value;
 });
 
@@ -495,9 +485,33 @@ document.addEventListener('submit', event => {
 
 $('#open-model').addEventListener('click', openModel);
 $('#model-icon').innerHTML = icon('sparkle');
-$('#provider-button').addEventListener('click', () => toggleCombo('#provider-button', '#provider-panel', '#provider-search'));
-$('#model-button').addEventListener('click', () => toggleCombo('#model-button', '#model-panel', '#model-search'));
-$('#check-models').addEventListener('click', () => checkModels());
+$('#provider-input').addEventListener('focus', () => openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions));
+$('#provider-input').addEventListener('input', () => openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions));
+$('#provider-input').addEventListener('blur', () => {
+  const query = $('#provider-input').value.trim().toLowerCase();
+  const match = state.providers.find(item => item.name.toLowerCase() === query || item.id === query);
+  if (match) selectProvider(match.id);
+  else {
+    const current = providerById(state.provider);
+    if (current) $('#provider-input').value = current.name;
+  }
+});
+$('#provider-input').addEventListener('keydown', event => {
+  if (event.key === 'Escape') { closeSuggestions(); return; }
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  const query = $('#provider-input').value.trim().toLowerCase();
+  const match = state.providers.find(item => item.name.toLowerCase() === query || item.id === query);
+  if (match) selectProvider(match.id);
+  closeSuggestions();
+});
+$('#model-name').addEventListener('focus', () => openSuggestions($('#model-name'), $('#model-panel'), renderModelOptions));
+$('#model-name').addEventListener('input', () => openSuggestions($('#model-name'), $('#model-panel'), renderModelOptions));
+$('#model-name').addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === 'Escape') { event.preventDefault(); closeSuggestions(); }
+});
+$('#get-models').addEventListener('click', () => checkModels());
+for (const panel of ['#provider-panel', '#model-panel']) $(panel).addEventListener('mousedown', event => event.preventDefault());
 $('#open-settings').addEventListener('click', openPreferences);
 $('#settings-icon').innerHTML = icon('settings');
 $('#open-about').addEventListener('click', () => $('#about-dialog').showModal());
