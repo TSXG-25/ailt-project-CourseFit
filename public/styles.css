@@ -270,6 +270,32 @@
   .dialog-symbol { display: none; }
   dialog > .muted { font-size: calc(0.867rem * var(--font-scale-other)); line-height: 1.8; margin-bottom: 24px; }
   #model-form > label, #custom-fields > label { margin-top: 18px; }
+
+  /* Connect a model dialog: layering by subtle colour steps, no hard lines.
+     Focus uses a deepened double-ring shadow instead of a bright outline. */
+  #model-dialog { background: #fcfdff; }
+  #model-dialog input,
+  #model-dialog select,
+  #model-dialog .combo-input {
+    border: 1px solid #dde3ef;
+    background: #fff;
+    box-shadow: 0 1px 2px #1d29420d;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  #model-dialog input:hover,
+  #model-dialog select:hover,
+  #model-dialog .combo-input:hover { border-color: #ccd6e8; }
+  #model-dialog input:focus,
+  #model-dialog input:focus-visible,
+  #model-dialog select:focus,
+  #model-dialog select:focus-visible,
+  #model-dialog .combo-input:focus,
+  #model-dialog .combo-input:focus-visible {
+    outline: none;
+    border-color: #c3cee6;
+    box-shadow: 0 0 0 3px #e9eefd, 0 0 0 6px #d6e0fb;
+  }
+  #model-dialog .combo-panel { border-color: #dde3ef; }
   #model-form > .checkbox-label { margin-top: 24px; }
   .combo { position: relative; }
   .combo-input { width: 100%; }
