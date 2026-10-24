@@ -6,3 +6,5 @@ node_modules/
 coverage/
 test-results/
 .DS_Store
+.codebuddy
+.playwright-cli
