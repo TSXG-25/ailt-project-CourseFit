@@ -272,6 +272,17 @@
   #model-form > .checkbox-label { margin-top: 24px; }
   .dialog-actions { display: flex; justify-content: space-between; gap: 16px; margin-top: 22px; }
   .settings-note { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 18px; font-size: 0.733rem; color: var(--muted); }
+  #font-size { -webkit-appearance: none; appearance: none; display: block; width: calc(100% - 60px); margin: 0 auto; height: 30px; padding: 0; border: 0; min-height: 0; background: transparent; cursor: pointer; }
+  #font-size::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: #d5deed; }
+  #font-size::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; margin-top: -7px; border: 0; border-radius: 50%; background: var(--blue); }
+  #font-size::-moz-range-track { height: 4px; border-radius: 2px; background: #d5deed; }
+  #font-size::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--blue); }
+  .font-size-tiers { position: relative; width: calc(100% - 60px); margin: 0 auto 10px; height: 1.5em; font-size: 0.667rem; color: var(--muted); }
+  .font-size-tiers span { position: absolute; top: 0; white-space: nowrap; transform: translateX(-50%); }
+  .font-size-tiers span:first-child { left: 9px; }
+  .font-size-tiers span:nth-child(2) { left: calc(9px + (100% - 18px) / 3); }
+  .font-size-tiers span:nth-child(3) { left: calc(9px + (100% - 18px) * 2 / 3); }
+  .font-size-tiers span:last-child { left: calc(100% - 9px); }
   .example-option { display: flex; width: 100%; align-items: center; gap: 15px; text-align: left; padding: 20px 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; margin-top: 12px; }
   .example-option:hover { background: #f4f6ff; border-color: #b0bff1; }
   .example-option > .icon { color: var(--blue); width: 23px; height: 23px; }

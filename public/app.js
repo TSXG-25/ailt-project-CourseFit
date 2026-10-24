@@ -29,6 +29,8 @@ const colorStyle = index => { const [bg, ink, border] = COLORS[index % COLORS.le
 const minute = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
 const state = { step: 0, input: '', examples: [], config: { configured: false }, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
 const FONT_SCALES = { small: 0.9, medium: 1, large: 1.15, xlarge: 1.3 };
+const FONT_KEYS = ['small', 'medium', 'large', 'xlarge'];
+const FONT_LABELS = { small: 'Small', medium: 'Medium', large: 'Large', xlarge: 'Extra large' };
 const FONT_KEY_DEFAULT = 'medium';
 const FONT_STORAGE_KEY = 'coursefit.fontScale';
 function applyFontSize(key) {
@@ -36,6 +38,12 @@ function applyFontSize(key) {
   document.documentElement.style.setProperty('--font-scale', String(scale));
 }
 function savedFontKey() { return localStorage.getItem(FONT_STORAGE_KEY) || FONT_KEY_DEFAULT; }
+function fontIndex(key) { const index = FONT_KEYS.indexOf(key); return index < 0 ? FONT_KEYS.indexOf(FONT_KEY_DEFAULT) : index; }
+function fontKeyAt(value) { return FONT_KEYS[Number(value)] ?? FONT_KEY_DEFAULT; }
+function updateFontSizeLabel() {
+  const key = fontKeyAt($('#font-size').value);
+  $('#font-size').setAttribute('aria-valuetext', FONT_LABELS[key]);
+}
 
 async function api(path, { method = 'GET', body } = {}) {
   let response;
@@ -260,7 +268,8 @@ function openModel() {
 }
 
 function openPreferences() {
-  $('#font-size').value = savedFontKey();
+  $('#font-size').value = String(fontIndex(savedFontKey()));
+  updateFontSizeLabel();
   $('#preferences-dialog').showModal();
 }
 
@@ -377,10 +386,11 @@ $('#model-icon').innerHTML = icon('sparkle');
 $('#open-settings').addEventListener('click', openPreferences);
 $('#settings-icon').innerHTML = icon('settings');
 $('#open-about').addEventListener('click', () => $('#about-dialog').showModal());
-$('#font-size').addEventListener('change', event => {
-  const key = event.target.value;
+$('#font-size').addEventListener('input', event => {
+  const key = fontKeyAt(event.target.value);
   applyFontSize(key);
   localStorage.setItem(FONT_STORAGE_KEY, key);
+  updateFontSizeLabel();
 });
 $('#model-form').addEventListener('submit', async event => {
   event.preventDefault();
