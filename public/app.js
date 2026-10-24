@@ -83,7 +83,9 @@ function updateConnection() {
   const dot = $('#connection-dot');
   dot.classList.toggle('connected', state.config.configured);
   dot.setAttribute('aria-label', state.config.configured ? 'DeepSeek configured' : 'DeepSeek not configured');
-  $('#open-model').setAttribute('aria-label', state.config.configured ? 'Model, DeepSeek configured' : 'Model, connect DeepSeek');
+  const modelLabel = $('#model-label');
+  modelLabel.textContent = state.config.configured ? state.config.model : 'Model';
+  $('#open-model').setAttribute('aria-label', state.config.configured ? `Model, DeepSeek configured (${state.config.model})` : 'Model, connect DeepSeek');
 }
 function renderSteps() {
   const titles = ['Your courses', 'A few details', 'Your timetable'];

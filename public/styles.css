@@ -68,6 +68,7 @@
   .button-secondary { border-color: #d6deec; background: #fff; }
   .button-secondary:hover { background: #f0f3fc; border-color: #b2c1ec; }
   .button-quiet { padding: 8px 10px; }
+  .model-label { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .button-quiet:hover { background: #edf1fb; }
   .button-danger-quiet { color: var(--red); padding-left: 0; }
   .button-danger-quiet:hover { background: #fff0f2; }
