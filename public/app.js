@@ -318,16 +318,27 @@ function setModel(value) {
 function providerById(id) {
   return state.providers.find(item => item.id === id) || null;
 }
+// The value the model field would hold without user typing: the saved model
+// when a key is configured, otherwise the DeepSeek default and nothing else.
+function modelFieldValue(provider) {
+  if (state.config.configured) return state.config.model || '';
+  return provider && provider.id === 'deepseek' ? 'deepseek-flash' : '';
+}
 function selectProvider(id) {
   const provider = providerById(id);
   if (!provider) return;
+  const previous = providerById(state.provider);
   state.provider = provider.id;
   state.models = [];
   $('#provider-input').value = provider.name;
   $('#custom-fields').hidden = !provider.needsBaseUrl;
   $('#get-models').hidden = Boolean(provider.needsBaseUrl);
-  $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : `Enter your ${provider.name} API key`;
-  setModel(provider.defaultModel || '');
+  $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : (provider.keyHint || `Enter your ${provider.name} API key`);
+  $('#model-name').placeholder = provider.defaultModel ? `e.g. ${provider.defaultModel}` : 'e.g. your-model-name';
+  // Typed model names survive a provider switch; only auto-filled values refresh.
+  const auto = previous ? modelFieldValue(previous) : '';
+  const input = $('#model-name');
+  if (input.value === '' || input.value === auto) input.value = modelFieldValue(provider);
   renderModelOptions();
   setStatus(provider.needsBaseUrl ? 'Type the model name for this custom endpoint.' : 'Press Get Model to load suggestions, or type the model name.');
 }
@@ -355,9 +366,10 @@ function openModel() {
   $('#api-key').value = '';
   const configured = state.config.provider || 'deepseek';
   selectProvider(configured);
-  const provider = providerById(configured);
-  $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : `Enter your ${provider ? provider.name : 'provider'} API key`;
-  if (state.config.configured) setModel(state.config.model || provider?.defaultModel || '');
+  // The model field reflects saved settings only. Without a saved (or
+  // environment-provided) key there is nothing to show, except the DeepSeek
+  // default which is filled in as a convenience.
+  setModel(modelFieldValue(providerById(configured)));
   $('#custom-base-url').value = state.config.baseUrl || '';
   $('#custom-protocol').value = state.config.protocol || 'openai';
   $('#remember-key').checked = state.config.keySource === 'disk' || !state.config.configured;

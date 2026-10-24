@@ -100,7 +100,7 @@ export async function createApp({ settingsFile = join(ROOT, '.local/settings.jso
       if (method === 'DELETE' && path === '/api/config') return send(response, 200, await settings.clear());
       if (method === 'GET' && path === '/api/providers') {
         return send(response, 200, {
-          providers: PROVIDERS.map(({ id, name, group, note, needsBaseUrl, defaultModel }) => ({ id, name, group, note: note || '', needsBaseUrl: Boolean(needsBaseUrl), defaultModel: defaultModel || '' })),
+          providers: PROVIDERS.map(({ id, name, group, note, needsBaseUrl, defaultModel, keyHint }) => ({ id, name, group, note: note || '', needsBaseUrl: Boolean(needsBaseUrl), defaultModel: defaultModel || '', keyHint: keyHint || '' })),
           protocols: PROTOCOLS,
         });
       }
