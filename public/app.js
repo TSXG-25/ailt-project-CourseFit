@@ -389,7 +389,7 @@ $('#model-form').addEventListener('submit', async event => {
     state.config = await api('/api/config', { method: 'PUT', body: { apiKey: $('#api-key').value, model: $('#model-name').value.trim(), rememberKey: $('#remember-key').checked } });
     $('#api-key').value = ''; $('#model-dialog').close(); render(); announce('Model settings saved. The connection has not yet been tested; generate a timetable to use it.');
   } catch (error) { $('#model-error').textContent = error.message; $('#model-error').hidden = false; }
-  finally { button.disabled = false; button.textContent = 'Save'; }
+  finally { button.disabled = false; button.textContent = 'Save key'; }
 });
 $('#forget-key').addEventListener('click', async () => {
   $('#forget-key').disabled = true;
