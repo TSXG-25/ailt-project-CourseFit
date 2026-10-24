@@ -278,6 +278,7 @@
   .combo-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 10px; border-top: 1px solid #e3e8f4; }
   .combo-status { flex: 1 1 auto; height: 44px; display: flex; align-items: center; padding: 6px 14px; border-radius: 10px; background: #f5f7fc; border: 1px solid #e3e8f4; color: var(--muted); font-size: calc(0.733rem * var(--font-scale-other)); line-height: 1.45; overflow: hidden; }
   /* Errors keep their full wording, so let the box grow instead of clipping. */
+  .combo-status.ok { background: #eefaf1; border-color: #c4e7cc; color: #1e6b34; }
   .combo-status.error { height: auto; min-height: 44px; overflow: visible; background: #fff0f2; border-color: #f3cad0; color: #9b2335; }
   .combo-footer .button { flex-shrink: 0; }
   .combo-group + .combo-group { margin-top: 8px; }

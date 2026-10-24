@@ -307,10 +307,11 @@ function renderModelOptions() {
     ? `${shown.map(model => `<button type="button" class="combo-option" role="option" data-action="pick-model" data-model="${e(model)}">${e(model)}</button>`).join('')}${matches.length > shown.length ? `<p class="combo-empty">Showing the first ${shown.length} of ${matches.length}. Keep typing to narrow the list.</p>` : ''}`
     : (state.models.length ? '<p class="combo-empty">No model matches what you typed.</p>' : '');
 }
-function setStatus(text, isError = false) {
+function setStatus(text, kind = '') {
   const status = $('#model-status');
   status.textContent = text;
-  status.classList.toggle('error', Boolean(isError));
+  status.classList.toggle('error', kind === 'error');
+  status.classList.toggle('ok', kind === 'ok');
 }
 function setModel(value) {
   $('#model-name').value = value || '';
@@ -352,11 +353,11 @@ async function checkModels() {
   try {
     const output = await api('/api/models', { method: 'POST', body: { provider: state.provider, apiKey: $('#api-key').value, baseUrl: $('#custom-base-url').value, protocol: $('#custom-protocol').value } });
     state.models = output.models || [];
-    setStatus(`${state.models.length} model${state.models.length === 1 ? '' : 's'} available from ${output.providerName}.`);
+    setStatus(`${state.models.length} model${state.models.length === 1 ? '' : 's'} available from ${output.providerName}.`, 'ok');
     renderModelOptions();
     announce(`${output.providerName} returned ${state.models.length} models. Pick one, or type a model name.`);
   } catch (error) {
-    setStatus(`${error.message} You can still type the model name.`, true);
+    setStatus(`${error.message} You can still type the model name.`, 'error');
   } finally {
     state.checking = false;
     button.disabled = false; button.textContent = 'Get Model';
