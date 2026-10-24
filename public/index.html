@@ -43,17 +43,19 @@
         <select id="custom-protocol"></select>
       </div>
       <label for="api-key">API key</label>
-      <div class="key-row">
-        <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your API key">
-        <button type="button" class="button button-secondary" id="get-models" hidden>Get Model</button>
-      </div>
-      <p id="key-help" class="field-help">Your key is never returned to the browser or included in exports. Get Model lists the models available to this key; listing is free and does not spend tokens.</p>
+      <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your API key">
+      <p id="key-help" class="field-help">Your key is never returned to the browser or included in exports. Get Model (in the suggestions below) lists the models available to this key; listing is free and does not spend tokens.</p>
       <label for="model-name">Model</label>
       <div class="combo" id="model-combo">
         <input id="model-name" class="combo-input" type="text" role="combobox" aria-expanded="false" aria-controls="model-list" maxlength="120" autocomplete="off" spellcheck="false" placeholder="e.g. deepseek-flash">
-        <div class="combo-panel" id="model-panel" hidden><div class="combo-list" id="model-list" role="listbox" aria-label="Available models"></div></div>
+        <div class="combo-panel" id="model-panel" hidden>
+          <div class="combo-list" id="model-list" role="listbox" aria-label="Available models"></div>
+          <div class="combo-footer">
+            <span id="model-status" class="combo-status">Press Get Model to load suggestions, or type the model name.</span>
+            <button type="button" class="button button-secondary combo-action" id="get-models" hidden>Get Model</button>
+          </div>
+        </div>
       </div>
-      <p id="model-count" class="field-help">Type the model name, or press Get Model to load suggestions from your provider.</p>
       <label class="checkbox-label"><input id="remember-key" type="checkbox" checked><span>Remember the key on this device<span class="field-help">Saved in a local file with owner-only permissions, excluded from Git. Uncheck to keep it for this server session only.</span></span></label>
       <div id="model-error" class="notice notice-error" role="alert" hidden></div>
       <div class="dialog-actions"><button class="button button-danger-quiet" id="forget-key" type="button">Forget saved key</button><button class="button button-primary" id="save-model" type="submit">Save key</button></div>

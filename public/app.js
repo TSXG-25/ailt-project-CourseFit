@@ -305,7 +305,12 @@ function renderModelOptions() {
   const shown = matches.slice(0, 200);
   $('#model-list').innerHTML = shown.length
     ? `${shown.map(model => `<button type="button" class="combo-option" role="option" data-action="pick-model" data-model="${e(model)}">${e(model)}</button>`).join('')}${matches.length > shown.length ? `<p class="combo-empty">Showing the first ${shown.length} of ${matches.length}. Keep typing to narrow the list.</p>` : ''}`
-    : `<p class="combo-empty">${state.models.length ? 'No model matches what you typed.' : 'Press Get Model to load suggestions, or type the model name.'}</p>`;
+    : (state.models.length ? '<p class="combo-empty">No model matches what you typed.</p>' : '');
+}
+function setStatus(text, isError = false) {
+  const status = $('#model-status');
+  status.textContent = text;
+  status.classList.toggle('error', Boolean(isError));
 }
 function setModel(value) {
   $('#model-name').value = value || '';
@@ -323,7 +328,8 @@ function selectProvider(id) {
   $('#get-models').hidden = Boolean(provider.needsBaseUrl);
   $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : `Enter your ${provider.name} API key`;
   setModel(provider.defaultModel || '');
-  $('#model-count').textContent = 'Type the model name, or press Get Model to load suggestions.';
+  renderModelOptions();
+  setStatus(provider.needsBaseUrl ? 'Type the model name for this custom endpoint.' : 'Press Get Model to load suggestions, or type the model name.');
 }
 async function checkModels() {
   if (state.checking) return;
@@ -331,15 +337,15 @@ async function checkModels() {
   const button = $('#get-models');
   button.disabled = true; button.textContent = 'Getting…';
   $('#model-error').hidden = true;
+  setStatus('Loading models…');
   try {
     const output = await api('/api/models', { method: 'POST', body: { provider: state.provider, apiKey: $('#api-key').value, baseUrl: $('#custom-base-url').value, protocol: $('#custom-protocol').value } });
     state.models = output.models || [];
-    $('#model-count').textContent = `${state.models.length} model${state.models.length === 1 ? '' : 's'} available from ${output.providerName}. Suggestions appear when the Model field is focused.`;
+    setStatus(`${state.models.length} model${state.models.length === 1 ? '' : 's'} available from ${output.providerName}.`);
+    renderModelOptions();
     announce(`${output.providerName} returned ${state.models.length} models. Pick one, or type a model name.`);
   } catch (error) {
-    $('#model-error').textContent = `${error.message} You can still type the model name.`;
-    $('#model-error').hidden = false;
-    $('#model-count').textContent = 'Listing failed. Type the model name instead.';
+    setStatus(`${error.message} You can still type the model name.`, true);
   } finally {
     state.checking = false;
     button.disabled = false; button.textContent = 'Get Model';
@@ -485,7 +491,12 @@ document.addEventListener('submit', event => {
 
 $('#open-model').addEventListener('click', openModel);
 $('#model-icon').innerHTML = icon('sparkle');
-$('#provider-input').addEventListener('focus', () => openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions));
+$('#provider-input').addEventListener('focus', () => {
+  // Focusing clears the field so the user retypes; blur restores the previous
+  // provider when the new text is not an exact match.
+  $('#provider-input').value = '';
+  openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions);
+});
 $('#provider-input').addEventListener('input', () => openSuggestions($('#provider-input'), $('#provider-panel'), renderProviderOptions));
 $('#provider-input').addEventListener('blur', () => {
   const query = $('#provider-input').value.trim().toLowerCase();
