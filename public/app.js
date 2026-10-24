@@ -27,7 +27,7 @@ const ICONS = {
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.calendar}</svg>`;
 const colorStyle = index => { const [bg, ink, border] = COLORS[index % COLORS.length]; return `--course-bg:${bg};--course-ink:${ink};--course-border:${border}`; };
 const minute = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
-const state = { step: 0, input: '', examples: [], config: { configured: false }, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
+const state = { step: 0, input: '', examples: [], config: { configured: false }, providers: [], protocols: [], provider: 'deepseek', models: [], checking: false, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
 const FONT_SCALES = { small: 0.9, medium: 1, large: 1.15, xlarge: 1.3 };
 const FONT_KEYS = ['small', 'medium', 'large', 'xlarge'];
 const FONT_LABELS = { small: 'Small', medium: 'Medium', large: 'Large', xlarge: 'Extra large' };
@@ -273,14 +273,99 @@ function openExamples() {
   $('#example-options').innerHTML = state.examples.map((example, i) => `<button type="button" class="example-option" data-action="load-example" data-id="${e(example.id)}">${icon(['leaf', 'calendar', 'edit'][i])}<span><strong>${e(example.name)}</strong><small>${e(example.description)}</small></span><span class="arrow" aria-hidden="true">›</span></button>`).join('') || '<p class="notice notice-error">Examples could not be loaded. Check that the local server is running and refresh.</p>';
   $('#examples-dialog').showModal();
 }
+function renderProtocolOptions() {
+  const protocols = state.protocols.length ? state.protocols : [{ id: 'openai', name: 'OpenAI compatible' }];
+  $('#custom-protocol').innerHTML = protocols.map(item => `<option value="${e(item.id)}">${e(item.name)}</option>`).join('');
+}
+function closeCombos() {
+  $('#provider-panel').hidden = true; $('#provider-button').setAttribute('aria-expanded', 'false');
+  $('#model-panel').hidden = true; $('#model-button').setAttribute('aria-expanded', 'false');
+}
+function toggleCombo(buttonId, panelId, searchId) {
+  const panel = $(panelId);
+  const opening = panel.hidden;
+  closeCombos();
+  panel.hidden = !opening;
+  $(buttonId).setAttribute('aria-expanded', String(opening));
+  if (!opening) return;
+  $(searchId).value = '';
+  state.providerQuery = ''; state.modelQuery = '';
+  renderProviderOptions();
+  renderModelOptions();
+  $(searchId).focus();
+}
+function renderProviderOptions() {
+  const query = String(state.providerQuery || '').trim().toLowerCase();
+  const matches = state.providers.filter(item => !query || item.name.toLowerCase().includes(query) || item.id.includes(query));
+  const groups = [['international', 'International'], ['china', 'China'], ['custom', 'Custom']];
+  const html = groups.map(([id, label]) => {
+    const items = matches.filter(item => item.group === id);
+    if (!items.length) return '';
+    return `<div class="combo-group"><p class="combo-group-title">${label}</p>${items.map(item => `<button type="button" class="combo-option${item.id === state.provider ? ' selected' : ''}" role="option" aria-selected="${item.id === state.provider}" data-action="pick-provider" data-id="${e(item.id)}">${e(item.name)}${item.note ? `<span class="combo-note">${e(item.note)}</span>` : ''}</button>`).join('')}</div>`;
+  }).join('');
+  $('#provider-list').innerHTML = html || '<p class="combo-empty">No provider matches your search.</p>';
+}
+function renderModelOptions() {
+  const query = String(state.modelQuery || '').trim().toLowerCase();
+  const matches = state.models.filter(model => !query || model.toLowerCase().includes(query));
+  const shown = matches.slice(0, 200);
+  $('#model-list').innerHTML = shown.length
+    ? `${shown.map(model => `<button type="button" class="combo-option${model === $('#model-name').value ? ' selected' : ''}" role="option" data-action="pick-model" data-model="${e(model)}">${e(model)}</button>`).join('')}${matches.length > shown.length ? `<p class="combo-empty">Showing the first ${shown.length} of ${matches.length}. Search to narrow the list.</p>` : ''}`
+    : `<p class="combo-empty">${state.models.length ? 'No model matches your search.' : 'Press “Check available models” to load the list, or type the model name below.'}</p>`;
+}
+function setModel(value) {
+  $('#model-name').value = value || '';
+  $('#model-value').textContent = value || 'Select a model';
+}
+function providerById(id) {
+  return state.providers.find(item => item.id === id) || null;
+}
+function selectProvider(id) {
+  const provider = providerById(id);
+  if (!provider) return;
+  state.provider = provider.id;
+  state.models = [];
+  $('#provider-value').textContent = provider.name;
+  $('#custom-fields').hidden = !provider.needsBaseUrl;
+  setModel(provider.defaultModel || '');
+  $('#model-count').textContent = 'Uses your key to list models. Listing is free; it does not spend tokens.';
+  renderModelOptions();
+}
+async function checkModels() {
+  if (state.checking) return;
+  state.checking = true;
+  const button = $('#check-models');
+  button.disabled = true; button.textContent = 'Checking…';
+  $('#model-error').hidden = true;
+  try {
+    const output = await api('/api/models', { method: 'POST', body: { provider: state.provider, apiKey: $('#api-key').value, baseUrl: $('#custom-base-url').value, protocol: $('#custom-protocol').value } });
+    state.models = output.models || [];
+    $('#model-count').textContent = `${state.models.length} model${state.models.length === 1 ? '' : 's'} available from ${output.providerName}.`;
+    renderModelOptions();
+    announce(`${output.providerName} returned ${state.models.length} models. Pick one, or type a model name.`);
+  } catch (error) {
+    $('#model-error').textContent = `${error.message} You can still type the model name below.`;
+    $('#model-error').hidden = false;
+    $('#model-count').textContent = 'Listing failed. Type the model name below.';
+  } finally {
+    state.checking = false;
+    button.disabled = false; button.textContent = 'Check available models';
+  }
+}
 function openModel() {
   $('#api-key').value = '';
-  $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : 'Enter your DeepSeek API key';
-  $('#model-name').value = state.config.model || 'deepseek-flash';
+  const configured = state.config.provider || 'deepseek';
+  selectProvider(configured);
+  const provider = providerById(configured);
+  $('#api-key').placeholder = state.config.configured ? 'A key is configured. Leave blank to keep it.' : `Enter your ${provider ? provider.name : 'provider'} API key`;
+  if (state.config.configured) setModel(state.config.model || provider?.defaultModel || '');
+  $('#custom-base-url').value = state.config.baseUrl || '';
+  $('#custom-protocol').value = state.config.protocol || 'openai';
   $('#remember-key').checked = state.config.keySource === 'disk' || !state.config.configured;
   $('#key-help').textContent = state.config.configured ? `Key source: ${state.config.keySource === 'disk' ? 'saved on this device' : state.config.keySource === 'environment' ? 'environment variable' : 'current server session'}. The key itself is never returned to the browser.` : 'Your key is never returned to the browser or included in exports.';
   $('#forget-key').disabled = !state.config.configured;
   $('#model-error').hidden = true;
+  closeCombos();
   $('#model-dialog').showModal();
 }
 
@@ -299,7 +384,7 @@ async function parseForm() {
   state.input = $('#course-input').value;
   if (!state.input.trim()) throw new Error('Enter your courses and section times, or try an example.');
   if (!state.config.configured) { openModel(); return; }
-  state.busy = true; clearError(); render(); announce('DeepSeek is interpreting your courses and preferences.');
+  state.busy = true; clearError(); render(); announce(`${state.config.providerName || 'The model'} is interpreting your courses and preferences.`);
   try {
     applyGenerated(await api('/api/generate', { method: 'POST', body: { input: state.input } }));
     state.adjustment = '';
@@ -366,6 +451,8 @@ async function action(button) {
     if (state.input.trim()) { openExamples(); return; }
     state.input = state.examples[0]?.input || ''; render(); $('#course-input').focus(); return;
   }
+  if (type === 'pick-provider') { selectProvider(button.dataset.id); closeCombos(); return; }
+  if (type === 'pick-model') { setModel(button.dataset.model); closeCombos(); return; }
   if (type === 'select-result') { state.selected = i; clearError(); render(); announce(`Option ${i + 1} selected. ${state.result.solutions[i].explanation}`); return; }
   if (type === 'focus-refinement') { $('#adjustment-input').focus(); $('#refinement-form').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   if (type === 'download') { downloadSchedule(); return; }
@@ -374,6 +461,7 @@ async function action(button) {
 }
 
 document.addEventListener('click', event => {
+  if (!event.target.closest('.combo')) closeCombos();
   const close = event.target.closest('[data-close]');
   if (close) document.getElementById(close.dataset.close).close();
   const button = event.target.closest('[data-action]');
@@ -393,6 +481,9 @@ document.addEventListener('input', event => {
     }
   }
   if (target.id === 'adjustment-input') state.adjustment = target.value;
+  if (target.id === 'provider-search') { state.providerQuery = target.value; renderProviderOptions(); }
+  if (target.id === 'model-search') { state.modelQuery = target.value; renderModelOptions(); }
+  if (target.id === 'model-name') $('#model-value').textContent = target.value || 'Select a model';
   if (target.dataset.question !== undefined) state.resolutions[state.draft.data.clarifications[Number(target.dataset.question)]] = target.value;
 });
 
@@ -404,6 +495,9 @@ document.addEventListener('submit', event => {
 
 $('#open-model').addEventListener('click', openModel);
 $('#model-icon').innerHTML = icon('sparkle');
+$('#provider-button').addEventListener('click', () => toggleCombo('#provider-button', '#provider-panel', '#provider-search'));
+$('#model-button').addEventListener('click', () => toggleCombo('#model-button', '#model-panel', '#model-search'));
+$('#check-models').addEventListener('click', () => checkModels());
 $('#open-settings').addEventListener('click', openPreferences);
 $('#settings-icon').innerHTML = icon('settings');
 $('#open-about').addEventListener('click', () => $('#about-dialog').showModal());
@@ -421,8 +515,8 @@ $('#model-form').addEventListener('submit', async event => {
   event.preventDefault();
   const button = $('#save-model'); button.disabled = true; button.textContent = 'Saving…'; $('#model-error').hidden = true;
   try {
-    state.config = await api('/api/config', { method: 'PUT', body: { apiKey: $('#api-key').value, model: $('#model-name').value.trim(), rememberKey: $('#remember-key').checked } });
-    $('#api-key').value = ''; $('#model-dialog').close(); render(); announce('Model settings saved. The connection has not yet been tested; generate a timetable to use it.');
+    state.config = await api('/api/config', { method: 'PUT', body: { provider: state.provider, apiKey: $('#api-key').value, model: $('#model-name').value.trim(), rememberKey: $('#remember-key').checked, baseUrl: $('#custom-base-url').value, protocol: $('#custom-protocol').value } });
+    $('#api-key').value = ''; $('#model-dialog').close(); render(); announce(`${state.config.providerName || 'The model'} settings saved. The connection has not yet been tested; generate a timetable to use it.`);
   } catch (error) { $('#model-error').textContent = error.message; $('#model-error').hidden = false; }
   finally { button.disabled = false; button.textContent = 'Save key'; }
 });
@@ -439,8 +533,13 @@ $('#forget-key').addEventListener('click', async () => {
 migrateLegacyFontSize();
 applyAllFontSizes();
 render();
-const initial = await Promise.allSettled([api('/api/config'), api('/api/examples')]);
-if (initial[0].status === 'fulfilled') state.config = initial[0].value;
+const initial = await Promise.allSettled([api('/api/config'), api('/api/examples'), api('/api/providers')]);
+if (initial[0].status === 'fulfilled') {
+  state.config = initial[0].value;
+  if (initial[0].value.provider) state.provider = initial[0].value.provider;
+}
 if (initial[1].status === 'fulfilled') state.examples = initial[1].value;
+if (initial[2].status === 'fulfilled') { state.providers = initial[2].value.providers || []; state.protocols = initial[2].value.protocols || []; }
+renderProtocolOptions();
 render();
 for (const result of initial) if (result.status === 'rejected') showError(result.reason);

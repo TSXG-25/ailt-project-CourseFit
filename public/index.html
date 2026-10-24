@@ -28,18 +28,49 @@
   <div id="status" class="sr-only" role="status" aria-live="polite"></div>
 
   <dialog id="model-dialog" aria-labelledby="model-title">
-    <div class="dialog-heading"><div><span class="dialog-symbol" id="model-symbol" aria-hidden="true"></span><h2 id="model-title">Connect DeepSeek</h2></div><button class="icon-button" data-close="model-dialog" type="button" aria-label="Close model settings">×</button></div>
+    <div class="dialog-heading"><div><span class="dialog-symbol" id="model-symbol" aria-hidden="true"></span><h2 id="model-title">Connect a model</h2></div><button class="icon-button" data-close="model-dialog" type="button" aria-label="Close model settings">×</button></div>
     <p class="muted">Your key connects the language step. Timetable solving runs on your computer.</p>
     <form id="model-form">
-      <label for="api-key">DeepSeek API key</label>
+      <label for="provider-button">Model provider</label>
+      <div class="combo" id="provider-combo">
+        <button type="button" class="combo-button" id="provider-button" aria-haspopup="listbox" aria-expanded="false"><span id="provider-value" class="combo-value">DeepSeek</span><span class="combo-caret" aria-hidden="true">▾</span></button>
+        <div class="combo-panel" id="provider-panel" hidden>
+          <input id="provider-search" class="combo-search" type="text" placeholder="Search providers" autocomplete="off" spellcheck="false">
+          <div class="combo-list" id="provider-list" role="listbox" aria-label="Model providers"></div>
+        </div>
+      </div>
+      <div id="custom-fields" hidden>
+        <label for="custom-base-url">Base URL</label>
+        <input id="custom-base-url" type="text" placeholder="https://your-endpoint.example.com/v1" autocomplete="off" spellcheck="false">
+        <label for="custom-protocol">Protocol</label>
+        <select id="custom-protocol"></select>
+      </div>
+      <label for="api-key">API key</label>
       <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your API key">
       <p id="key-help" class="field-help">Your key is never returned to the browser or included in exports.</p>
-      <label for="model-name">Model</label><input id="model-name" value="deepseek-flash" required maxlength="80" pattern="[a-zA-Z0-9._\-]+" spellcheck="false">
+      <div class="model-row">
+        <div class="model-combo-cell">
+          <label for="model-button">Model</label>
+          <div class="combo" id="model-combo">
+            <button type="button" class="combo-button" id="model-button" aria-haspopup="listbox" aria-expanded="false"><span id="model-value" class="combo-value">deepseek-flash</span><span class="combo-caret" aria-hidden="true">▾</span></button>
+            <div class="combo-panel" id="model-panel" hidden>
+              <input id="model-search" class="combo-search" type="text" placeholder="Search models" autocomplete="off" spellcheck="false">
+              <div class="combo-list" id="model-list" role="listbox" aria-label="Available models"></div>
+            </div>
+          </div>
+        </div>
+        <div class="model-check-cell">
+          <button type="button" class="button button-secondary" id="check-models">Check available models</button>
+          <span id="model-count" class="field-help">Uses your key to list models. Listing is free; it does not spend tokens.</span>
+        </div>
+      </div>
+      <label for="model-name">Or type the model name</label>
+      <input id="model-name" maxlength="120" spellcheck="false" autocomplete="off" placeholder="e.g. deepseek-flash">
       <label class="checkbox-label"><input id="remember-key" type="checkbox" checked><span>Remember the key on this device<span class="field-help">Saved in a local file with owner-only permissions, excluded from Git. Uncheck to keep it for this server session only.</span></span></label>
       <div id="model-error" class="notice notice-error" role="alert" hidden></div>
       <div class="dialog-actions"><button class="button button-danger-quiet" id="forget-key" type="button">Forget saved key</button><button class="button button-primary" id="save-model" type="submit">Save key</button></div>
     </form>
-    <p class="settings-note">Parsing sends your course text to DeepSeek. Keep names, student IDs, emails and other personal information out of your input.</p>
+    <p class="settings-note">Parsing sends your course text to the provider you select here. Providers differ in how well they follow instructions, so results can differ. Keep names, student IDs, emails and other personal information out of your input.</p>
   </dialog>
 
   <dialog id="preferences-dialog" aria-labelledby="preferences-title">
