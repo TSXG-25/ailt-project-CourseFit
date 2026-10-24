@@ -70,7 +70,7 @@
   .button-quiet { padding: 8px 10px; }
   .model-label { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .button-quiet:hover { background: #edf1fb; }
-  .button-danger-quiet { color: var(--red); padding-left: 0; }
+  .button-danger-quiet { color: var(--red); }
   .button-danger-quiet:hover { background: #fff0f2; }
   .button:disabled { opacity: .55; }
   .text-button { border: 0; padding: 7px 0; background: transparent; color: var(--blue); font-size: inherit; font-weight: 600; text-align: left; }
@@ -269,7 +269,7 @@
   .dialog-heading .icon-button { flex-shrink: 0; }
   .dialog-symbol { display: none; }
   dialog > .muted { font-size: calc(0.867rem * var(--font-scale-other)); line-height: 1.8; margin-bottom: 24px; }
-  #model-form > label { margin-top: 18px; }
+  #model-form > label, #custom-fields > label { margin-top: 18px; }
   #model-form > .checkbox-label { margin-top: 24px; }
   .combo { position: relative; }
   .combo-input { width: 100%; }
