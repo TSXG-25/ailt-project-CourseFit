@@ -59,14 +59,16 @@ The independent exhaustive reference in `evaluation/reference.js` does not impor
 | Endpoint | Contract |
 | --- | --- |
 | `GET /api/health` | Server health. |
-| `GET /api/config` | Model and redacted key status. |
-| `PUT /api/config` | Save key/model locally or in session; does not call the provider. |
+| `GET /api/config` | Provider, model and redacted key status. |
+| `PUT /api/config` | Save provider, key, model, base URL and protocol locally or in session; does not call the provider. |
 | `DELETE /api/config` | Remove saved settings, restoring environment defaults. |
+| `GET /api/providers` | Available providers (id, name, group, key hint, whether a base URL is required, default model) and selectable protocols. |
+| `POST /api/models` | `{provider,apiKey?,baseUrl?,protocol?}` lists models for a provider without storing the key; falls back to a typed model name on any failure. Returns `{provider,providerName,models}`. |
 | `GET /api/examples` | Example descriptions and original text. |
 | `POST /api/generate` | `{input}` starts; `{exampleId}` loads an example; `{draftId,answers}` applies the single question batch; `{draftId,adjustment}` updates a result. Returns `{draft,result?,confirmationId?}`. |
 | `POST /api/explain` | `{confirmationId,scheduleId}` adds optional commentary about verified facts. |
 
-The snapshot identifier retains its legacy `confirmationId` name internally; there is no additional confirmation UI. Lower-level `/api/parse`, `/api/examples/load`, `/api/clarify`, `/api/confirm` and `/api/solve` remain for compatibility and module-level integration checks. The browser uses `/api/generate` throughout.
+The snapshot identifier retains its legacy `confirmationId` name internally; there is no additional confirmation UI. Lower-level `/api/parse`, `/api/examples/load`, `/api/clarify`, `/api/confirm` and `/api/solve` remain for compatibility and module-level integration checks. The browser loads `/api/config`, `/api/examples` and `/api/providers` on startup, uses `/api/models` to populate the model picker, and uses `/api/generate` throughout for extraction, solving and adjustments.
 
 Drafts, snapshots and cached results are bounded to 100 entries and expire after two hours. A server restart removes them. Keys are never returned or included in exports. Saved files use owner-only permissions and stay outside the static allowlist and Git.
 
