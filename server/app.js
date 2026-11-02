@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { InputError } from './schema.js';
 import { DraftStore } from './store.js';
 import { SettingsStore } from './settings.js';
-import { clarifyInput, modelJSON, parseInput, refineInput } from './parser.js';
+import { clarifyInput, modelJSON, parseSubmission, refineInput } from './parser.js';
 import { fetchModels, PROTOCOLS, PROVIDERS, resolveProvider } from './providers.js';
 import { solveTimetable } from './solver.js';
 import { generateResult } from './workflow.js';
@@ -18,6 +18,7 @@ const FILES = {
   '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
   '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
 };
+const PDFJS_PATH = /^(?:build\/(?:pdf|pdf\.worker)\.mjs|image_decoders\/[A-Za-z0-9_.-]+\.mjs|cmaps\/[A-Za-z0-9_.-]+\.bcmap|standard_fonts\/[A-Za-z0-9_.-]+\.(?:pfb|ttf)|wasm\/[A-Za-z0-9_.-]+\.(?:wasm|js)|iccs\/[A-Za-z0-9_.-]+\.icc)$/;
 
 function send(response, status, body) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -30,7 +31,7 @@ async function jsonBody(request) {
   const chunks = [];
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > 2_000_000) throw new InputError('Request is too large.', 413);
+    if (size > 12_000_000) throw new InputError('Request is too large. Compressed screenshots must total 8 MB or less.', 413);
     chunks.push(chunk);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString()); }
@@ -45,7 +46,9 @@ export async function createApp({ settingsFile = join(ROOT, '.local/settings.jso
 
   function finishDraft(data, input, source, context = {}) {
     const generated = generateResult(data);
-    const draft = store.create(generated.data, input, source, { ...context, questionRound: 1, notes: generated.notes });
+    const { notes: _previousNotes, sourceNotes = [], ...metadata } = context;
+    const notes = [...(Array.isArray(sourceNotes) ? sourceNotes : []), ...generated.notes];
+    const draft = store.create(generated.data, input, source, { ...metadata, sourceNotes, questionRound: 1, notes });
     let confirmationId = null;
     if (generated.result.status === 'solved') {
       confirmationId = store.savePlan(generated.data).confirmationId;
@@ -80,7 +83,8 @@ export async function createApp({ settingsFile = join(ROOT, '.local/settings.jso
         if (draft && body.adjustment === undefined && !Object.values(body.answers || {}).some(answer => typeof answer === 'string' && answer.trim())) {
           return send(response, 200, finishDraft(draft.data, draft.input, draft.source, draft));
         }
-        if (!draft && (typeof body?.input !== 'string' || !body.input.trim() || body.input.length > 100_000)) throw new InputError('Enter between 1 and 100,000 characters of courses and preferences.');
+        if (!draft && (body?.input !== undefined && (typeof body.input !== 'string' || body.input.length > 100_000))) throw new InputError('Enter up to 100,000 characters of courses and preferences.');
+        if (!draft && !body?.input?.trim() && !Array.isArray(body?.attachments)) throw new InputError('Add course text, a screenshot or a PDF before generating a timetable.');
         if (modelBusy) throw new InputError('Another model request is running. Please wait for it to finish.', 429);
         modelBusy = true;
         try {
@@ -90,9 +94,9 @@ export async function createApp({ settingsFile = join(ROOT, '.local/settings.jso
               : await clarifyInput(draft, draft.data, body.answers, settings.settings, { fetchImpl });
             return send(response, 200, finishDraft(updated.data, updated.input, 'deepseek', { ...draft, ...updated }));
           }
-          const data = await parseInput(body.input, settings.settings, { fetchImpl });
-          if (data.clarifications.length) return send(response, 200, { draft: store.create(data, body.input, 'deepseek') });
-          return send(response, 200, finishDraft(data, body.input, 'deepseek'));
+          const submission = await parseSubmission(body.input ?? '', body.attachments, settings.settings, { fetchImpl });
+          if (submission.data.clarifications.length) return send(response, 200, { draft: store.create(submission.data, submission.input, 'deepseek', { sourceNotes: submission.notes }) });
+          return send(response, 200, finishDraft(submission.data, submission.input, 'deepseek', { sourceNotes: submission.notes }));
         } finally { modelBusy = false; }
       }
       if (method === 'GET' && path === '/api/config') return send(response, 200, settings.public());
@@ -132,8 +136,8 @@ export async function createApp({ settingsFile = join(ROOT, '.local/settings.jso
         if (modelBusy) throw new InputError('Another model request is running. Please wait for it to finish.', 429);
         modelBusy = true;
         try {
-          const data = await parseInput(body?.input, settings.settings, { fetchImpl });
-          return send(response, 200, store.create(data, body.input, 'deepseek'));
+          const submission = await parseSubmission(body?.input ?? '', body?.attachments, settings.settings, { fetchImpl });
+          return send(response, 200, store.create(submission.data, submission.input, 'deepseek', { sourceNotes: submission.notes }));
         } finally { modelBusy = false; }
       }
       if (method === 'POST' && path === '/api/confirm') {
@@ -185,6 +189,16 @@ export async function createApp({ settingsFile = join(ROOT, '.local/settings.jso
         const [file, type] = FILES[path];
         const content = await readFile(join(ROOT, 'public', file));
         response.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache', 'Content-Length': content.length });
+        response.end(method === 'HEAD' ? undefined : content);
+        return;
+      }
+      const pdfjsPath = path.startsWith('/vendor/pdfjs/') ? path.slice('/vendor/pdfjs/'.length) : '';
+      if ((method === 'GET' || method === 'HEAD') && PDFJS_PATH.test(pdfjsPath)) {
+        const content = await readFile(join(ROOT, 'node_modules', 'pdfjs-dist', ...pdfjsPath.split('/')));
+        const type = pdfjsPath.endsWith('.mjs') ? 'text/javascript; charset=utf-8'
+          : pdfjsPath.endsWith('.ttf') ? 'font/ttf'
+            : 'application/octet-stream';
+        response.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=31536000, immutable', 'Content-Length': content.length });
         response.end(method === 'HEAD' ? undefined : content);
         return;
       }

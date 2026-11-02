@@ -86,25 +86,52 @@ export function authHeaders(resolved, apiKey) {
   return { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
 }
 
+function mapContent(content, mapImage) {
+  if (!Array.isArray(content)) return content;
+  return content.map(part => {
+    if (part?.type === 'image') return mapImage(part);
+    if (part?.type === 'text') return { type: 'text', text: part.text };
+    return part;
+  });
+}
+
 export function buildChatRequest(resolved, { messages, model, maxTokens, apiKey }) {
   const headers = authHeaders(resolved, apiKey);
   if (resolved.protocol === 'anthropic') {
     const system = messages.filter(message => message.role === 'system').map(message => message.content).join('\n\n');
-    const rest = messages.filter(message => message.role !== 'system').map(message => ({ role: message.role, content: message.content }));
+    const rest = messages.filter(message => message.role !== 'system').map(message => ({
+      role: message.role,
+      content: mapContent(message.content, image => ({
+        type: 'image', source: { type: 'base64', media_type: image.mimeType, data: image.data },
+      })),
+    }));
     const body = { model, max_tokens: maxTokens, temperature: 0, messages: rest };
     if (system) body.system = system;
     return { url: resolved.chatUrl, headers, body };
   }
   if (resolved.protocol === 'gemini') {
     const system = messages.filter(message => message.role === 'system').map(message => message.content).join('\n\n');
-    const contents = messages.filter(message => message.role !== 'system').map(message => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.content }] }));
+    const contents = messages.filter(message => message.role !== 'system').map(message => ({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts: Array.isArray(message.content)
+        ? message.content.map(part => part?.type === 'image'
+          ? { inlineData: { mimeType: part.mimeType, data: part.data } }
+          : { text: part?.text || '' })
+        : [{ text: message.content }],
+    }));
     const generationConfig = { temperature: 0, maxOutputTokens: maxTokens };
     if (resolved.jsonMode === 'response_mime') generationConfig.responseMimeType = 'application/json';
     const body = { contents, generationConfig };
     if (system) body.systemInstruction = { parts: [{ text: system }] };
     return { url: resolved.chatUrl.replace('{MODEL}', encodeURIComponent(model)), headers, body };
   }
-  const body = { model, messages, max_tokens: maxTokens, temperature: 0 };
+  const compatibleMessages = messages.map(message => ({
+    ...message,
+    content: mapContent(message.content, image => ({
+      type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.data}` },
+    })),
+  }));
+  const body = { model, messages: compatibleMessages, max_tokens: maxTokens, temperature: 0 };
   if (resolved.jsonMode === 'response_format') body.response_format = { type: 'json_object' };
   if (resolved.extraBody) Object.assign(body, resolved.extraBody);
   return { url: resolved.chatUrl, headers, body };

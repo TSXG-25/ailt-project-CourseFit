@@ -4,11 +4,16 @@
   "private": true,
   "description": "A local, confirmation-first timetable planner for AILT9019.",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node --env-file-if-exists=.env server/index.js",
     "dev": "node --env-file-if-exists=.env --watch server/index.js",
     "test": "node --test",
     "evaluate:parsing": "node --env-file-if-exists=.env scripts/evaluate-parsing.js"
+  },
+  "dependencies": {
+    "pdfjs-dist": "6.4.299"
   }
 }

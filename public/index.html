@@ -61,7 +61,7 @@
       <div id="model-error" class="notice notice-error" role="alert" hidden></div>
       <div class="dialog-actions"><button class="button button-danger-quiet" id="forget-key" type="button">Forget saved key</button><button class="button button-primary" id="save-model" type="submit">Save key</button></div>
     </form>
-    <p class="settings-note">Parsing sends your course text to the provider you select here. Providers differ in how well they follow instructions, so results can differ. Keep names, student IDs, emails and other personal information out of your input.</p>
+    <p class="settings-note">Parsing sends your course text, extracted PDF text, and screenshots or scanned pages that need visual reading to the provider you select here. Providers differ in how well they follow instructions, so results can differ. Keep names, student IDs, emails and other personal information out of your input.</p>
   </dialog>
 
   <dialog id="preferences-dialog" aria-labelledby="preferences-title">
@@ -93,7 +93,7 @@
 
   <dialog id="about-dialog" aria-labelledby="about-title">
     <div class="dialog-heading"><h2 id="about-title">A good week, one step at a time</h2><button class="icon-button" data-close="about-dialog" type="button" aria-label="Close explanation">×</button></div>
-    <ol class="about-steps"><li><strong>Bring your shortlist.</strong><p>Paste your courses, section options and preferences. There is no course or section count limit. Midnight catalogue slots ending at 08:00 or 08:20 are treated as online classes with no fixed meeting.</p></li><li><strong>Answer once, if needed.</strong><p>Any essential questions are grouped into one batch of up to five. Your answers go straight into generation, with no extra confirmation.</p></li><li><strong>Find your fit, then fine-tune.</strong><p>Compare clash-free options and describe any adjustment in your own words. Only timetables satisfying every hard constraint are shown; each soft preference earns one point.</p></li></ol>
+    <ol class="about-steps"><li><strong>Bring your shortlist.</strong><p>Paste your courses, section options and preferences, or add a screenshot or PDF. Text PDFs are read in your browser; scanned pages are sent to your selected model for visual reading. There is no course or section count limit. Midnight catalogue slots ending at 08:00 or 08:20 are treated as online classes with no fixed meeting.</p></li><li><strong>Answer once, if needed.</strong><p>Any essential questions are grouped into one batch of up to five. Your answers go straight into generation, with no extra confirmation.</p></li><li><strong>Find your fit, then fine-tune.</strong><p>Compare clash-free options and describe any adjustment in your own words. Only timetables satisfying every hard constraint are shown; each soft preference earns one point.</p></li></ol>
     <div class="notice notice-info">CourseFit does not choose courses for you, enrol you, or check seats. Times repeat weekly in the local times you provide; dates, alternating weeks and travel time are not modelled.</div>
     <p class="field-help">Plans stay in server memory for up to two hours and disappear when the server restarts. Large searches have a time budget; incomplete searches are labelled. Model explanations are optional; preference checks come directly from the solver.</p>
   </dialog>
