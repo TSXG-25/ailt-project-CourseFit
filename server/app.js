@@ -19,6 +19,13 @@ const FILES = {
   '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
 };
 const PDFJS_PATH = /^(?:build\/(?:pdf|pdf\.worker)\.mjs|image_decoders\/[A-Za-z0-9_.-]+\.mjs|cmaps\/[A-Za-z0-9_.-]+\.bcmap|standard_fonts\/[A-Za-z0-9_.-]+\.(?:pfb|ttf)|wasm\/[A-Za-z0-9_.-]+\.(?:wasm|js)|iccs\/[A-Za-z0-9_.-]+\.icc)$/;
+const OCR_CORE_PATH = /^\/vendor\/tesseract\/core\/(tesseract-core(?:-(?:simd|lstm|simd-lstm|relaxedsimd|relaxedsimd-lstm))?\.(?:js|wasm|wasm\.js))$/;
+const OCR_ASSETS = new Map([
+  ['/vendor/tesseract/tesseract.esm.min.js', ['tesseract.js/dist/tesseract.esm.min.js', 'text/javascript; charset=utf-8']],
+  ['/vendor/tesseract/worker.min.js', ['tesseract.js/dist/worker.min.js', 'text/javascript; charset=utf-8']],
+  ['/vendor/tessdata/eng.traineddata.gz', ['@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz', 'application/gzip']],
+  ['/vendor/tessdata/chi_tra.traineddata.gz', ['@tesseract.js-data/chi_tra/4.0.0_best_int/chi_tra.traineddata.gz', 'application/gzip']],
+]);
 
 function send(response, status, body) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -31,7 +38,7 @@ async function jsonBody(request) {
   const chunks = [];
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > 12_000_000) throw new InputError('Request is too large. Compressed screenshots must total 8 MB or less.', 413);
+    if (size > 12_000_000) throw new InputError('Request is too large. Remove files or reduce the extracted text.', 413);
     chunks.push(chunk);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString()); }
@@ -62,7 +69,7 @@ export async function createApp({ settingsFile = join(ROOT, '.local/settings.jso
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'no-referrer');
     response.setHeader('X-Frame-Options', 'DENY');
-    response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     try {
       const host = request.headers.host || '';
       if (!/^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(host)) throw new InputError('CourseFit accepts local requests only.', 403);
@@ -199,6 +206,16 @@ export async function createApp({ settingsFile = join(ROOT, '.local/settings.jso
           : pdfjsPath.endsWith('.ttf') ? 'font/ttf'
             : 'application/octet-stream';
         response.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=31536000, immutable', 'Content-Length': content.length });
+        response.end(method === 'HEAD' ? undefined : content);
+        return;
+      }
+      if ((method === 'GET' || method === 'HEAD') && (OCR_ASSETS.has(path) || OCR_CORE_PATH.test(path))) {
+        const coreMatch = path.match(OCR_CORE_PATH);
+        const [file, type] = coreMatch
+          ? [`tesseract.js-core/${coreMatch[1]}`, coreMatch[1].endsWith('.wasm') ? 'application/wasm' : 'text/javascript; charset=utf-8']
+          : OCR_ASSETS.get(path);
+        const content = await readFile(join(ROOT, 'node_modules', ...file.split('/')));
+        response.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=86400', 'Content-Length': content.length });
         response.end(method === 'HEAD' ? undefined : content);
         return;
       }

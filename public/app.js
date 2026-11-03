@@ -29,7 +29,7 @@ const ICONS = {
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.calendar}</svg>`;
 const colorStyle = index => { const [bg, ink, border] = COLORS[index % COLORS.length]; return `--course-bg:${bg};--course-ink:${ink};--course-border:${border}`; };
 const minute = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
-const state = { step: 0, input: '', attachments: [], readingFiles: false, examples: [], config: { configured: false }, providers: [], protocols: [], provider: 'deepseek', models: [], checking: false, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
+const state = { step: 0, input: '', attachments: [], readingFiles: false, readingMessage: '', examples: [], config: { configured: false }, providers: [], protocols: [], provider: 'deepseek', models: [], checking: false, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
 const FONT_SCALES = { small: 0.9, medium: 1, large: 1.15, xlarge: 1.3 };
 const FONT_KEYS = ['small', 'medium', 'large', 'xlarge'];
 const FONT_LABELS = { small: 'Small', medium: 'Medium', large: 'Large', xlarge: 'Extra large' };
@@ -105,39 +105,102 @@ function editableDraftText(draft) {
 
 const MAX_UPLOADS = 8;
 const MAX_VISUALS = 8;
-const MAX_IMAGE_BYTES = 8_000_000;
 const MAX_SOURCE_BYTES = 30_000_000;
 const MAX_PDF_PAGES = 100;
 let pdfjsPromise;
+let localOcrWorkerPromise;
 
-function totalImageBytes(attachments) {
-  return attachments.flatMap(item => item.images).reduce((sum, image) => sum + Math.floor(image.data.length * 3 / 4), 0);
+function setReadingMessage(message) {
+  state.readingMessage = message;
+  const status = $('#attachment-list .attachment-status');
+  if (status) status.textContent = message;
 }
 
-async function compressCanvas(canvas) {
-  for (const quality of [0.88, 0.78, 0.68, 0.58, 0.48]) {
-    const dataUrl = canvas.toDataURL('image/jpeg', quality);
-    const data = dataUrl.slice(dataUrl.indexOf(',') + 1);
-    if (Math.floor(data.length * 3 / 4) <= 1_500_000) return data;
+async function getLocalOcrWorker() {
+  localOcrWorkerPromise ||= import('/vendor/tesseract/tesseract.esm.min.js').then(module => {
+    // The browser ESM bundle exposes the CommonJS API through its default export.
+    const createWorker = module.default?.createWorker ?? module.createWorker;
+    if (typeof createWorker !== 'function') throw new Error('The bundled OCR module does not expose createWorker.');
+    return createWorker(['eng', 'chi_tra'], 1, {
+      workerPath: '/vendor/tesseract/worker.min.js',
+      corePath: '/vendor/tesseract/core',
+      langPath: '/vendor/tessdata',
+      cachePath: 'coursefit-tesseract-7-eng-chi-tra',
+      cacheMethod: 'write',
+      workerBlobURL: false,
+      gzip: true,
+      logger: message => {
+        if (!state.readingFiles || !message.status) return;
+        const percent = Number.isFinite(message.progress) ? ` ${Math.round(message.progress * 100)}%` : '';
+        setReadingMessage(`Local OCR · ${message.status}${percent}`);
+      },
+    });
+  }).catch(error => {
+    localOcrWorkerPromise = null;
+    throw new Error(`Local OCR could not start: ${error.message || 'check that the local OCR files are installed.'}`);
+  });
+  return localOcrWorkerPromise;
+}
+
+function formatOcrWords(words) {
+  const positioned = (words || []).filter(word => word.text?.trim() && word.bbox)
+    .map(word => ({ ...word.bbox, text: word.text.trim() }))
+    .sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0);
+  if (!positioned.length) return '';
+  const rows = [];
+  for (const word of positioned) {
+    const height = Math.max(1, word.y1 - word.y0);
+    const row = rows.find(candidate => {
+      const overlap = Math.min(candidate.y1, word.y1) - Math.max(candidate.y0, word.y0);
+      return overlap >= Math.min(candidate.height, height) * 0.45;
+    });
+    if (row) {
+      row.words.push(word);
+      row.y0 = Math.min(row.y0, word.y0);
+      row.y1 = Math.max(row.y1, word.y1);
+      row.height = row.y1 - row.y0;
+    } else rows.push({ y0: word.y0, y1: word.y1, height, words: [word] });
   }
-  throw new Error('A screenshot is too large to send. Crop it to the course table or choose a smaller image.');
+  return rows.sort((a, b) => a.y0 - b.y0).map(row => {
+    row.words.sort((a, b) => a.x0 - b.x0);
+    let text = '';
+    let previous = null;
+    for (const word of row.words) {
+      if (previous) {
+        const gap = word.x0 - previous.x1;
+        text += gap > Math.max(12, row.height * 1.25) ? '\t' : ' ';
+      }
+      text += word.text;
+      previous = word;
+    }
+    return text.trim();
+  }).filter(Boolean).join('\n');
 }
 
-async function screenshotImage(file) {
+async function recognizeCanvas(canvas, label) {
+  setReadingMessage(`Preparing local OCR · ${label}`);
+  const worker = await getLocalOcrWorker();
+  setReadingMessage(`Reading locally · ${label}`);
+  const { data } = await worker.recognize(canvas, {}, { blocks: true, tsv: true });
+  const text = formatOcrWords(data.words) || data.text?.trim() || '';
+  if (!text) throw new Error(`${label} has no readable text. Crop a clearer image or enter the course details as text.`);
+  return text;
+}
+
+async function ocrScreenshot(file) {
   const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
   try {
-    const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
     const context = canvas.getContext('2d');
     context.fillStyle = '#fff';
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const data = await compressCanvas(canvas);
-    canvas.width = 0; canvas.height = 0;
-    return { mimeType: 'image/jpeg', data, label: 'screenshot' };
-  } finally { bitmap.close?.(); }
+    const text = await recognizeCanvas(canvas, file.name);
+    return { name: file.name, kind: 'image', text: `Screenshot OCR:\n${text}`, visualPages: 1, size: file.size, pages: 1 };
+  } finally { bitmap.close?.(); canvas.width = 0; canvas.height = 0; }
 }
 
 function formatPdfPage(items) {
@@ -200,16 +263,16 @@ async function readPdf(file) {
   }
   const pageCount = pdf.numPages;
   const textPages = [];
-  const images = [];
+  const ocrPages = [];
   try {
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
       const page = await pdf.getPage(pageNumber);
       const text = formatPdfPage((await page.getTextContent()).items);
-      if (text) textPages.push(`Page ${pageNumber}:\n${text}`);
+      if (text.length >= 120) textPages.push(`Page ${pageNumber} (PDF text):\n${text}`);
       if (text.length < 120) {
-        if (images.length >= MAX_VISUALS) throw new Error(`${file.name} has more than 8 scanned or image-only pages. Split it into smaller PDFs or export the relevant pages as screenshots.`);
+        if (ocrPages.length >= MAX_VISUALS) throw new Error(`${file.name} has more than 8 scanned or image-only pages. Split it into smaller PDFs or export the relevant pages as screenshots.`);
         const base = page.getViewport({ scale: 1 });
-        const scale = Math.min(1.7, 1800 / Math.max(base.width, base.height));
+        const scale = Math.min(1.7, 2200 / Math.max(base.width, base.height));
         const viewport = page.getViewport({ scale });
         const canvas = document.createElement('canvas');
         canvas.width = Math.ceil(viewport.width);
@@ -218,13 +281,15 @@ async function readPdf(file) {
         context.fillStyle = '#fff';
         context.fillRect(0, 0, canvas.width, canvas.height);
         await page.render({ canvasContext: context, viewport }).promise;
-        images.push({ mimeType: 'image/jpeg', data: await compressCanvas(canvas), label: `page ${pageNumber}` });
-        canvas.width = 0; canvas.height = 0;
+        try {
+          const ocrText = await recognizeCanvas(canvas, `${file.name} · page ${pageNumber}`);
+          ocrPages.push(`Page ${pageNumber} (local OCR):\n${ocrText}`);
+        } finally { canvas.width = 0; canvas.height = 0; }
       }
       page.cleanup();
     }
   } finally { await pdf.destroy(); }
-  return { name: file.name, kind: 'pdf', text: textPages.join('\n\n'), images, size: file.size, pages: pageCount };
+  return { name: file.name, kind: 'pdf', text: [...textPages, ...ocrPages].join('\n\n'), visualPages: ocrPages.length, size: file.size, pages: pageCount };
 }
 
 async function prepareFile(file) {
@@ -232,7 +297,7 @@ async function prepareFile(file) {
   const extension = file.name.split('.').pop().toLowerCase();
   if (file.type === 'application/pdf' || extension === 'pdf') return readPdf(file);
   if (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension)) {
-    return { name: file.name, kind: 'image', text: '', images: [await screenshotImage(file)], size: file.size, pages: 1 };
+    return ocrScreenshot(file);
   }
   throw new Error(`${file.name} is not supported. Add a PNG, JPEG, WebP, GIF or PDF.`);
 }
@@ -244,26 +309,27 @@ async function addFiles(fileList) {
   if (state.attachments.length + files.length > MAX_UPLOADS) throw new Error('Add up to 8 screenshots or PDFs at a time.');
   if ([...state.attachments, ...files].reduce((sum, file) => sum + (file.size || 0), 0) > MAX_SOURCE_BYTES) throw new Error('Selected files must total 30 MB or less. Remove a file or choose smaller files.');
   state.readingFiles = true;
+  state.readingMessage = 'Preparing local OCR…';
   render();
   try {
     const prepared = [];
     for (const file of files) prepared.push(await prepareFile(file));
     const all = [...state.attachments, ...prepared];
-    const imageCount = all.reduce((sum, item) => sum + item.images.length, 0);
-    if (imageCount > MAX_VISUALS) throw new Error('Use up to 8 screenshots or scanned pages. Split a scanned PDF into smaller files.');
-    if (totalImageBytes(all) > MAX_IMAGE_BYTES) throw new Error('Compressed screenshots must total 8 MB or less. Crop the images or remove a file.');
+    const visualCount = all.reduce((sum, item) => sum + item.visualPages, 0);
+    if (visualCount > MAX_VISUALS) throw new Error('Use up to 8 screenshots or scanned pages. Split a scanned PDF into smaller files.');
     state.attachments = all;
     announce(`${prepared.length} file${prepared.length === 1 ? '' : 's'} ready to read.`);
   } finally {
     state.readingFiles = false;
+    state.readingMessage = '';
     render();
   }
 }
 
 function renderAttachmentList() {
-  if (state.readingFiles) return '<p class="attachment-status" role="status">Reading your files in this browser…</p>';
+  if (state.readingFiles) return `<p class="attachment-status" role="status">${e(state.readingMessage || 'Reading your files locally…')}</p>`;
   if (!state.attachments.length) return '';
-  return `<ul class="attachment-list">${state.attachments.map((item, index) => `<li><span class="attachment-icon" aria-hidden="true">${icon(item.kind === 'pdf' ? 'file' : 'upload')}</span><span class="attachment-info"><strong>${e(item.name)}</strong><small>${item.kind === 'pdf' ? `PDF · ${item.pages} page${item.pages === 1 ? '' : 's'}${item.text ? ` · ${item.text.length.toLocaleString()} text characters` : ''}` : 'Screenshot'}${item.images.length ? ` · ${item.images.length} page image${item.images.length === 1 ? '' : 's'} for visual reading` : ''}</small></span><button type="button" class="attachment-remove" data-action="remove-attachment" data-index="${index}" aria-label="Remove ${e(item.name)}" ${state.busy ? 'disabled' : ''}>Remove</button></li>`).join('')}</ul>`;
+  return `<ul class="attachment-list">${state.attachments.map((item, index) => `<li><span class="attachment-icon" aria-hidden="true">${icon(item.kind === 'pdf' ? 'file' : 'upload')}</span><span class="attachment-info"><strong>${e(item.name)}</strong><small>${item.kind === 'pdf' ? `PDF · ${item.pages} page${item.pages === 1 ? '' : 's'}${item.text ? ` · ${item.text.length.toLocaleString()} extracted characters` : ''}` : `Screenshot · ${item.text.length.toLocaleString()} characters OCR'd locally`}${item.visualPages ? ` · ${item.visualPages} scanned page${item.visualPages === 1 ? '' : 's'} OCR'd locally` : ''}</small><details class="attachment-preview"><summary>Review extracted text</summary><pre>${e(item.text || 'No selectable text was found in this PDF.')}</pre></details></span><button type="button" class="attachment-remove" data-action="remove-attachment" data-index="${index}" aria-label="Remove ${e(item.name)}" ${state.busy ? 'disabled' : ''}>Remove</button></li>`).join('')}</ul>`;
 }
 
 function renderInput() {
@@ -277,9 +343,9 @@ function renderInput() {
       <div class="input-label"><label for="course-input">Courses, section times & preferences</label><div class="input-tools"><button class="text-button" type="button" data-action="clear-input" ${state.busy || state.readingFiles ? 'disabled' : ''}>Clear input</button><button class="text-button" type="button" data-action="format" ${state.busy || state.readingFiles ? 'disabled' : ''}>Use this format</button></div></div>
       <textarea id="course-input" maxlength="100000" placeholder="${e(placeholder)}" ${state.busy ? 'disabled' : ''}>${e(state.input)}</textarea>
       <div class="input-toolbar"><span>Include every lecture and tutorial in each section.</span><span id="character-count">${state.input.length.toLocaleString()} / 100,000</span></div>
-      <div class="file-import"><div><strong>Have a course timetable image or PDF?</strong><p>CourseFit reads text PDFs in your browser and sends scanned pages to your selected model for visual reading.</p></div><input id="course-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" multiple aria-label="Choose course screenshots or PDFs" hidden ${state.busy || state.readingFiles ? 'disabled' : ''}><button type="button" class="button button-secondary" data-action="choose-files" ${state.busy || state.readingFiles ? 'disabled' : ''}>${icon('upload')}${state.readingFiles ? 'Reading files…' : 'Add screenshot or PDF'}</button><span class="file-help">PNG, JPEG, WebP, GIF or PDF · up to 8 files · 20 MB each · 30 MB total</span></div>
+      <div class="file-import"><div><strong>Have a course timetable image or PDF?</strong><p>Text PDFs are extracted in your browser. Screenshots and scanned pages are read by bundled offline OCR on this device; review the extracted text before generating.</p></div><input id="course-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" multiple aria-label="Choose course screenshots or PDFs" hidden ${state.busy || state.readingFiles ? 'disabled' : ''}><button type="button" class="button button-secondary" data-action="choose-files" ${state.busy || state.readingFiles ? 'disabled' : ''}>${icon('upload')}${state.readingFiles ? 'Reading locally…' : 'Add screenshot or PDF'}</button><span class="file-help">PNG, JPEG, WebP, GIF or PDF · up to 8 files · 20 MB each · 30 MB total</span></div>
       <div id="attachment-list">${renderAttachmentList()}</div>
-      <div class="privacy-note">${icon('lock')}<span>Use course information only. Leave out personal details. Generating sends your text, extracted PDF text and screenshots or scanned pages that need visual reading to your selected model. Files are read in this browser and are not saved by CourseFit; examples stay local.</span></div>
+      <div class="privacy-note">${icon('lock')}<span>Use course information only. Leave out personal details. Screenshots and PDFs are processed in this browser and are not uploaded or saved by CourseFit. Generating sends your typed text and locally extracted text to your selected model for timetable interpretation. Check the extracted text against the original file.</span></div>
       <div class="form-actions"><button type="button" class="button button-secondary" data-action="examples" ${state.busy || state.readingFiles ? 'disabled' : ''}>${icon('calendar')}Try an example</button><button class="button button-primary" id="parse-button" type="submit" ${state.busy || state.readingFiles ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Reading your input…' : `Generate my timetable${icon('arrow')}`}</button></div>
       <p class="field-help" style="margin-bottom:0;margin-top:16px">${state.config.configured ? `Your model (${e(state.config.model)}) is configured. A few questions if needed, then straight to your timetable.` : 'No API key yet? Try a pre-parsed example, or connect a model in Model.'}</p>
     </form>

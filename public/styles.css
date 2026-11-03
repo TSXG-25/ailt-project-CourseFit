@@ -127,6 +127,9 @@
   .attachment-info { display: grid; gap: 2px; min-width: 0; flex: 1; }
   .attachment-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(0.733rem * var(--font-scale-other)); font-weight: 600; }
   .attachment-info small { color: var(--muted); font-size: calc(0.667rem * var(--font-scale-other)); line-height: 1.4; }
+  .attachment-preview { margin-top: 6px; color: var(--ink); font-size: calc(0.667rem * var(--font-scale-other)); }
+  .attachment-preview summary { width: fit-content; color: #5266a5; cursor: pointer; }
+  .attachment-preview pre { max-height: 190px; overflow: auto; margin: 8px 0 0; padding: 10px; border: 1px solid #e1e6f0; border-radius: 6px; background: #fafbfe; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
   .attachment-remove { border: 0; background: transparent; color: #5266a5; min-width: 44px; min-height: 44px; padding: 8px; font: inherit; font-size: calc(0.667rem * var(--font-scale-button)); cursor: pointer; }
   .attachment-remove:hover { color: #9a3f4b; }
   .attachment-status { margin: 0 0 15px; padding: 11px 13px; color: #455987; background: #f1f4fc; border-radius: 7px; font-size: calc(0.733rem * var(--font-scale-other)); }
