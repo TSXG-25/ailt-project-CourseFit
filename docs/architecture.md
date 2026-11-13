@@ -1,12 +1,14 @@
 # Architecture
 
-CourseFit uses Node.js 22+ built-ins and browser-native JavaScript/CSS. The language step extracts data; a deterministic solver generates and ranks timetables. No build pipeline, database or dependency installation is required.
+CourseFit uses Node.js 22.13+ built-ins, browser-native JavaScript/CSS, PDF.js for PDF reading and Tesseract.js for local OCR. The language step extracts data; a deterministic solver generates and ranks timetables. Install dependencies with `npm ci`; there is no build pipeline or database.
 
 ## Generation flow
 
 ```mermaid
 flowchart LR
   A[Course text and preferences] --> B[Model JSON extraction]
+  N[Screenshot or PDF] --> O[Browser extracts PDF text and locally OCRs images and scans]
+  O --> B
   B --> C[Schema and source checks]
   C --> D{Essential questions?}
   D -->|Yes, once| E[One batch of up to five questions]
@@ -28,11 +30,13 @@ The browser never requires a confirmation checkbox. A Generate or Update request
 
 The four required plan arrays are `courses`, `hardConstraints`, `softPreferences` and `clarifications`. Courses have unique codes and section IDs; each section contains all required weekly meetings. Section metadata can include `semester: 1 | 2` and `asynchronous: true`.
 
-There are no course, section or meeting count caps. Generation rejects mixed semesters and unknown meeting facts. The public input budget is 100,000 characters and JSON request bodies are limited to 2 MB; provider context/output limits still apply.
+There are no course, section or meeting count caps. Generation rejects mixed semesters and unknown meeting facts. The public text budget is 100,000 characters. Uploads support up to 8 files, 20 MB per file and 30 MB total; PDF text is extracted in the browser for up to 100 pages. A request can include up to 8 locally OCR’d screenshot or scan pages, and JSON request bodies are limited to 12 MB. Provider context/output limits still apply.
 
 Schema normalization recognizes 00:00–08:00 and 00:00–08:20 catalogue slots as online placeholders, including missing-day rows and equivalent unpadded times. Purely online sections use `asynchronous: true, meetings: []`. In mixed bundles, only the online placeholder is removed; real weekly meetings remain. Other missing times are never assumed online.
 
 Every model-extracted course, section and rule needs a short contiguous `evidence` quote. The parser anchors quotes to the supplied source, accepting formatting-only whitespace, dash, quotation-mark and full-width ASCII variations. This does not independently prove the semantic accuracy of extracted times. Examples are pre-parsed and need no model call.
+
+Original PDFs and screenshots stay in the browser and are not uploaded. PDF.js extracts selectable text and renders scan-only pages; the bundled Tesseract.js worker and English/Traditional Chinese language data OCR screenshots and rendered pages locally. Word boxes are grouped into rows and separated into approximate columns. The browser submits only typed and extracted text to the selected provider for timetable interpretation. OCR can misread table cells; the input screen exposes extracted text for review, and the in-memory draft retains it for later review.
 
 ## One question round and adjustments
 
@@ -65,7 +69,7 @@ The independent exhaustive reference in `evaluation/reference.js` does not impor
 | `GET /api/providers` | Available providers (id, name, group, key hint, whether a base URL is required, default model) and selectable protocols. |
 | `POST /api/models` | `{provider,apiKey?,baseUrl?,protocol?}` lists models for a provider without storing the key; falls back to a typed model name on any failure. Returns `{provider,providerName,models}`. |
 | `GET /api/examples` | Example descriptions and original text. |
-| `POST /api/generate` | `{input}` starts; `{exampleId}` loads an example; `{draftId,answers}` applies the single question batch; `{draftId,adjustment}` updates a result. Returns `{draft,result?,confirmationId?}`. |
+| `POST /api/generate` | `{input,attachments?}` starts from typed text and optional browser-extracted files; `{exampleId}` loads an example; `{draftId,answers}` applies the single question batch; `{draftId,adjustment}` updates a result. Returns `{draft,result?,confirmationId?}`. |
 | `POST /api/explain` | `{confirmationId,scheduleId}` adds optional commentary about verified facts. |
 
 The snapshot identifier retains its legacy `confirmationId` name internally; there is no additional confirmation UI. Lower-level `/api/parse`, `/api/examples/load`, `/api/clarify`, `/api/confirm` and `/api/solve` remain for compatibility and module-level integration checks. The browser loads `/api/config`, `/api/examples` and `/api/providers` on startup, uses `/api/models` to populate the model picker, and uses `/api/generate` throughout for extraction, solving and adjustments.

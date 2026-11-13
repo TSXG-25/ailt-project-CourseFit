@@ -18,16 +18,18 @@ const ICONS = {
   leaf: '<path d="M19 4c-9-2-16 3-14 10 2 6 10 5 12 0 1-3 1-6 2-10Z"/><path d="M4 21 15 9m-7 8-1-5m4 1h5"/>',
   edit: '<path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14z"/>',
   remove: '<path d="m7 7 10 10M7 17 17 7"/>',
+  file: '<path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10z"/><path d="M13 3v7h7M8 14h8m-8 4h8"/>',
   lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/>',
   minus: '<path d="M5 12h14"/>',
   print: '<path d="M7 8V3h10v5M7 17H4V9h16v8h-3M7 14h10v7H7z"/>',
   download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+  upload: '<path d="M12 16V4m-5 5 5-5 5 5M4 15v5h16v-5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/>',
 };
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.calendar}</svg>`;
 const colorStyle = index => { const [bg, ink, border] = COLORS[index % COLORS.length]; return `--course-bg:${bg};--course-ink:${ink};--course-border:${border}`; };
 const minute = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
-const state = { step: 0, input: '', examples: [], config: { configured: false }, providers: [], protocols: [], provider: 'deepseek', models: [], checking: false, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
+const state = { step: 0, input: '', attachments: [], readingFiles: false, readingMessage: '', examples: [], config: { configured: false }, providers: [], protocols: [], provider: 'deepseek', models: [], checking: false, draft: null, plan: null, resolutions: {}, adjustment: '', confirmationId: null, result: null, selected: 0, busy: false, explanations: {}, explaining: null };
 const FONT_SCALES = { small: 0.9, medium: 1, large: 1.15, xlarge: 1.3 };
 const FONT_KEYS = ['small', 'medium', 'large', 'xlarge'];
 const FONT_LABELS = { small: 'Small', medium: 'Medium', large: 'Large', xlarge: 'Extra large' };
@@ -101,6 +103,235 @@ function editableDraftText(draft) {
   return `${draft.originalInput || draft.input}${answers.length ? `\n\nMy clarification answers:\n${answers.map(([question, answer]) => `${question}\n${answer}`).join('\n\n')}` : ''}${draft.adjustments?.length ? `\n\nMy later adjustments (latest overrides earlier preferences):\n${draft.adjustments.join('\n')}` : ''}`;
 }
 
+const MAX_UPLOADS = 8;
+const MAX_VISUALS = 8;
+const MAX_SOURCE_BYTES = 30_000_000;
+const MAX_PDF_PAGES = 100;
+let pdfjsPromise;
+let localOcrWorkerPromise;
+
+function setReadingMessage(message) {
+  state.readingMessage = message;
+  const status = $('#attachment-list .attachment-status');
+  if (status) status.textContent = message;
+}
+
+async function getLocalOcrWorker() {
+  localOcrWorkerPromise ||= import('/vendor/tesseract/tesseract.esm.min.js').then(module => {
+    // The browser ESM bundle exposes the CommonJS API through its default export.
+    const createWorker = module.default?.createWorker ?? module.createWorker;
+    if (typeof createWorker !== 'function') throw new Error('The bundled OCR module does not expose createWorker.');
+    return createWorker(['eng', 'chi_tra'], 1, {
+      workerPath: '/vendor/tesseract/worker.min.js',
+      corePath: '/vendor/tesseract/core',
+      langPath: '/vendor/tessdata',
+      cachePath: 'coursefit-tesseract-7-eng-chi-tra',
+      cacheMethod: 'write',
+      workerBlobURL: false,
+      gzip: true,
+      logger: message => {
+        if (!state.readingFiles || !message.status) return;
+        const percent = Number.isFinite(message.progress) ? ` ${Math.round(message.progress * 100)}%` : '';
+        setReadingMessage(`Local OCR · ${message.status}${percent}`);
+      },
+    });
+  }).catch(error => {
+    localOcrWorkerPromise = null;
+    throw new Error(`Local OCR could not start: ${error.message || 'check that the local OCR files are installed.'}`);
+  });
+  return localOcrWorkerPromise;
+}
+
+function formatOcrWords(words) {
+  const positioned = (words || []).filter(word => word.text?.trim() && word.bbox)
+    .map(word => ({ ...word.bbox, text: word.text.trim() }))
+    .sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0);
+  if (!positioned.length) return '';
+  const rows = [];
+  for (const word of positioned) {
+    const height = Math.max(1, word.y1 - word.y0);
+    const row = rows.find(candidate => {
+      const overlap = Math.min(candidate.y1, word.y1) - Math.max(candidate.y0, word.y0);
+      return overlap >= Math.min(candidate.height, height) * 0.45;
+    });
+    if (row) {
+      row.words.push(word);
+      row.y0 = Math.min(row.y0, word.y0);
+      row.y1 = Math.max(row.y1, word.y1);
+      row.height = row.y1 - row.y0;
+    } else rows.push({ y0: word.y0, y1: word.y1, height, words: [word] });
+  }
+  return rows.sort((a, b) => a.y0 - b.y0).map(row => {
+    row.words.sort((a, b) => a.x0 - b.x0);
+    let text = '';
+    let previous = null;
+    for (const word of row.words) {
+      if (previous) {
+        const gap = word.x0 - previous.x1;
+        text += gap > Math.max(12, row.height * 1.25) ? '\t' : ' ';
+      }
+      text += word.text;
+      previous = word;
+    }
+    return text.trim();
+  }).filter(Boolean).join('\n');
+}
+
+async function recognizeCanvas(canvas, label) {
+  setReadingMessage(`Preparing local OCR · ${label}`);
+  const worker = await getLocalOcrWorker();
+  setReadingMessage(`Reading locally · ${label}`);
+  const { data } = await worker.recognize(canvas, {}, { blocks: true, tsv: true });
+  const text = formatOcrWords(data.words) || data.text?.trim() || '';
+  if (!text) throw new Error(`${label} has no readable text. Crop a clearer image or enter the course details as text.`);
+  return text;
+}
+
+async function ocrScreenshot(file) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  try {
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const text = await recognizeCanvas(canvas, file.name);
+    return { name: file.name, kind: 'image', text: `Screenshot OCR:\n${text}`, visualPages: 1, size: file.size, pages: 1 };
+  } finally { bitmap.close?.(); canvas.width = 0; canvas.height = 0; }
+}
+
+function formatPdfPage(items) {
+  const positioned = [];
+  for (const item of items) {
+    if (!item.str?.trim() || !item.transform) continue;
+    positioned.push({
+      x: item.transform[4], y: item.transform[5], width: item.width || 0,
+      height: Math.hypot(item.transform[2], item.transform[3]), text: item.str.trim(),
+    });
+  }
+  positioned.sort((a, b) => b.y - a.y || a.x - b.x);
+  const rows = [];
+  for (const item of positioned) {
+    let row = rows.at(-1);
+    if (!row || Math.abs(row.y - item.y) > Math.max(2, Math.min(4, item.height * 0.25))) {
+      row = { y: item.y, parts: [] };
+      rows.push(row);
+    }
+    row.parts.push(item);
+  }
+  return rows.map(row => {
+    row.parts.sort((a, b) => a.x - b.x);
+    let line = '';
+    let right = null;
+    for (const part of row.parts) {
+      const gap = right === null ? 0 : part.x - right;
+      line += (line ? (gap > 28 ? '\t' : ' ') : '') + part.text;
+      right = part.x + part.width;
+    }
+    return line;
+  }).join('\n').trim();
+}
+
+async function readPdf(file) {
+  pdfjsPromise ||= import('/vendor/pdfjs/build/pdf.mjs').then(module => {
+    module.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/build/pdf.worker.mjs';
+    return module;
+  });
+  const pdfjs = await pdfjsPromise;
+  const data = new Uint8Array(await file.arrayBuffer());
+  let pdf;
+  try {
+    pdf = await pdfjs.getDocument({
+      data,
+      cMapUrl: '/vendor/pdfjs/cmaps/',
+      cMapPacked: true,
+      standardFontDataUrl: '/vendor/pdfjs/standard_fonts/',
+      wasmUrl: '/vendor/pdfjs/wasm/',
+      isEvalSupported: false,
+    }).promise;
+  } catch (error) {
+    if (error?.name === 'PasswordException') throw new Error(`${file.name} is password protected. Export an unlocked copy and add it again.`);
+    throw new Error(`${file.name} could not be opened. Use an unlocked PDF and try again.`);
+  }
+  if (pdf.numPages > MAX_PDF_PAGES) {
+    const pageCount = pdf.numPages;
+    await pdf.destroy();
+    throw new Error(`${file.name} has ${pageCount} pages. Upload a shorter PDF with the relevant course pages.`);
+  }
+  const pageCount = pdf.numPages;
+  const textPages = [];
+  const ocrPages = [];
+  try {
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const text = formatPdfPage((await page.getTextContent()).items);
+      if (text.length >= 120) textPages.push(`Page ${pageNumber} (PDF text):\n${text}`);
+      if (text.length < 120) {
+        if (ocrPages.length >= MAX_VISUALS) throw new Error(`${file.name} has more than 8 scanned or image-only pages. Split it into smaller PDFs or export the relevant pages as screenshots.`);
+        const base = page.getViewport({ scale: 1 });
+        const scale = Math.min(1.7, 2200 / Math.max(base.width, base.height));
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: context, viewport }).promise;
+        try {
+          const ocrText = await recognizeCanvas(canvas, `${file.name} · page ${pageNumber}`);
+          ocrPages.push(`Page ${pageNumber} (local OCR):\n${ocrText}`);
+        } finally { canvas.width = 0; canvas.height = 0; }
+      }
+      page.cleanup();
+    }
+  } finally { await pdf.destroy(); }
+  return { name: file.name, kind: 'pdf', text: [...textPages, ...ocrPages].join('\n\n'), visualPages: ocrPages.length, size: file.size, pages: pageCount };
+}
+
+async function prepareFile(file) {
+  if (file.size > 20_000_000) throw new Error(`${file.name} is over 20 MB. Crop or split it before uploading.`);
+  const extension = file.name.split('.').pop().toLowerCase();
+  if (file.type === 'application/pdf' || extension === 'pdf') return readPdf(file);
+  if (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension)) {
+    return ocrScreenshot(file);
+  }
+  throw new Error(`${file.name} is not supported. Add a PNG, JPEG, WebP, GIF or PDF.`);
+}
+
+async function addFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  if (state.busy || state.readingFiles) return;
+  if (state.attachments.length + files.length > MAX_UPLOADS) throw new Error('Add up to 8 screenshots or PDFs at a time.');
+  if ([...state.attachments, ...files].reduce((sum, file) => sum + (file.size || 0), 0) > MAX_SOURCE_BYTES) throw new Error('Selected files must total 30 MB or less. Remove a file or choose smaller files.');
+  state.readingFiles = true;
+  state.readingMessage = 'Preparing local OCR…';
+  render();
+  try {
+    const prepared = [];
+    for (const file of files) prepared.push(await prepareFile(file));
+    const all = [...state.attachments, ...prepared];
+    const visualCount = all.reduce((sum, item) => sum + item.visualPages, 0);
+    if (visualCount > MAX_VISUALS) throw new Error('Use up to 8 screenshots or scanned pages. Split a scanned PDF into smaller files.');
+    state.attachments = all;
+    announce(`${prepared.length} file${prepared.length === 1 ? '' : 's'} ready to read.`);
+  } finally {
+    state.readingFiles = false;
+    state.readingMessage = '';
+    render();
+  }
+}
+
+function renderAttachmentList() {
+  if (state.readingFiles) return `<p class="attachment-status" role="status">${e(state.readingMessage || 'Reading your files locally…')}</p>`;
+  if (!state.attachments.length) return '';
+  return `<ul class="attachment-list">${state.attachments.map((item, index) => `<li><span class="attachment-icon" aria-hidden="true">${icon(item.kind === 'pdf' ? 'file' : 'upload')}</span><span class="attachment-info"><strong>${e(item.name)}</strong><small>${item.kind === 'pdf' ? `PDF · ${item.pages} page${item.pages === 1 ? '' : 's'}${item.text ? ` · ${item.text.length.toLocaleString()} extracted characters` : ''}` : `Screenshot · ${item.text.length.toLocaleString()} characters OCR'd locally`}${item.visualPages ? ` · ${item.visualPages} scanned page${item.visualPages === 1 ? '' : 's'} OCR'd locally` : ''}</small><details class="attachment-preview"><summary>Review extracted text</summary><pre>${e(item.text || 'No selectable text was found in this PDF.')}</pre></details></span><button type="button" class="attachment-remove" data-action="remove-attachment" data-index="${index}" aria-label="Remove ${e(item.name)}" ${state.busy ? 'disabled' : ''}>Remove</button></li>`).join('')}</ul>`;
+}
+
 function renderInput() {
   const placeholder = `COMP2119 Data Structures\n  A: Mon 10:00–12:00 and Wed 10:00–11:00\n  B: Tue 14:00–16:00 and Thu 14:00–15:00\nMATH1853 Linear Algebra\n  A: Mon 13:00–15:00\n  B: Fri 09:00–11:00\n\nI cannot attend before 10:00.\nI would prefer Friday off.`;
   return `${heading('Make room for a better week.', 'Your courses. Your preferences. A timetable that brings them together.', `<div class="heading-meta">${icon('shield')}Generate your week. Fine-tune as you go.</div>`)}
@@ -109,11 +340,13 @@ function renderInput() {
       <div class="panel-title"><h2>Start with your shortlist</h2><span class="pill">Your full shortlist</span></div>
       <p class="panel-description">Add each course, its available sections and what a good week looks like for you.</p>
       ${state.draft?.source === 'example' ? '<p class="notice notice-info" style="margin-bottom:18px">You are editing an example. Use Clear input before pasting your own course catalogue.</p>' : ''}
-      <div class="input-label"><label for="course-input">Courses, section times & preferences</label><div class="input-tools"><button class="text-button" type="button" data-action="clear-input">Clear input</button><button class="text-button" type="button" data-action="format">Use this format</button></div></div>
-      <textarea id="course-input" maxlength="100000" required placeholder="${e(placeholder)}" ${state.busy ? 'disabled' : ''}>${e(state.input)}</textarea>
+      <div class="input-label"><label for="course-input">Courses, section times & preferences</label><div class="input-tools"><button class="text-button" type="button" data-action="clear-input" ${state.busy || state.readingFiles ? 'disabled' : ''}>Clear input</button><button class="text-button" type="button" data-action="format" ${state.busy || state.readingFiles ? 'disabled' : ''}>Use this format</button></div></div>
+      <textarea id="course-input" maxlength="100000" placeholder="${e(placeholder)}" ${state.busy ? 'disabled' : ''}>${e(state.input)}</textarea>
       <div class="input-toolbar"><span>Include every lecture and tutorial in each section.</span><span id="character-count">${state.input.length.toLocaleString()} / 100,000</span></div>
-      <div class="privacy-note">${icon('lock')}<span>Use course information only. Leave out personal details. Generating your timetable sends this text to your model; examples stay local.</span></div>
-      <div class="form-actions"><button type="button" class="button button-secondary" data-action="examples" ${state.busy ? 'disabled' : ''}>${icon('calendar')}Try an example</button><button class="button button-primary" id="parse-button" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Reading your input…' : `Generate my timetable${icon('arrow')}`}</button></div>
+      <div class="file-import"><div><strong>Have a course timetable image or PDF?</strong><p>Text PDFs are extracted in your browser. Screenshots and scanned pages are read by bundled offline OCR on this device; review the extracted text before generating.</p></div><input id="course-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" multiple aria-label="Choose course screenshots or PDFs" hidden ${state.busy || state.readingFiles ? 'disabled' : ''}><button type="button" class="button button-secondary" data-action="choose-files" ${state.busy || state.readingFiles ? 'disabled' : ''}>${icon('upload')}${state.readingFiles ? 'Reading locally…' : 'Add screenshot or PDF'}</button><span class="file-help">PNG, JPEG, WebP, GIF or PDF · up to 8 files · 20 MB each · 30 MB total</span></div>
+      <div id="attachment-list">${renderAttachmentList()}</div>
+      <div class="privacy-note">${icon('lock')}<span>Use course information only. Leave out personal details. Screenshots and PDFs are processed in this browser and are not uploaded or saved by CourseFit. Generating sends your typed text and locally extracted text to your selected model for timetable interpretation. Check the extracted text against the original file.</span></div>
+      <div class="form-actions"><button type="button" class="button button-secondary" data-action="examples" ${state.busy || state.readingFiles ? 'disabled' : ''}>${icon('calendar')}Try an example</button><button class="button button-primary" id="parse-button" type="submit" ${state.busy || state.readingFiles ? 'disabled' : ''}>${state.busy ? '<span class="spinner" aria-hidden="true"></span>Reading your input…' : `Generate my timetable${icon('arrow')}`}</button></div>
       <p class="field-help" style="margin-bottom:0;margin-top:16px">${state.config.configured ? `Your model (${e(state.config.model)}) is configured. A few questions if needed, then straight to your timetable.` : 'No API key yet? Try a pre-parsed example, or connect a model in Model.'}</p>
     </form>
     <aside class="input-aside">
@@ -260,11 +493,11 @@ function applyGenerated(output) {
 }
 
 async function loadExample(id) {
-  if (state.busy) return;
+  if (state.busy || state.readingFiles) return;
   state.busy = true;
   try {
     const output = await api('/api/generate', { method: 'POST', body: { exampleId: id } });
-    applyGenerated(output); state.input = output.draft.input; state.adjustment = '';
+    applyGenerated(output); state.input = output.draft.input; state.attachments = []; state.adjustment = '';
     $('#examples-dialog').close(); clearError();
   } finally { state.busy = false; render({ focus: true }); }
 }
@@ -422,12 +655,15 @@ function openPreferences() {
 
 async function parseForm() {
   if (state.busy) return;
+  if (state.readingFiles) throw new Error('Wait for CourseFit to finish reading your files.');
   state.input = $('#course-input').value;
-  if (!state.input.trim()) throw new Error('Enter your courses and section times, or try an example.');
+  if (!state.input.trim() && !state.attachments.length) throw new Error('Enter your courses and section times, add a screenshot or PDF, or try an example.');
   if (!state.config.configured) { openModel(); return; }
   state.busy = true; clearError(); render(); announce(`${state.config.providerName || 'The model'} is interpreting your courses and preferences.`);
   try {
-    applyGenerated(await api('/api/generate', { method: 'POST', body: { input: state.input } }));
+    const output = await api('/api/generate', { method: 'POST', body: { input: state.input, attachments: state.attachments } });
+    state.attachments = [];
+    applyGenerated(output);
     state.adjustment = '';
   } finally { state.busy = false; render({ focus: true }); }
 }
@@ -477,19 +713,26 @@ function downloadSchedule() {
 async function action(button) {
   const type = button.dataset.action;
   const i = Number(button.dataset.index);
-  if (state.busy) return;
+  if (state.busy || state.readingFiles) return;
   if (type === 'step') {
     if (i === 0 && state.draft) state.input = editableDraftText(state.draft);
     state.step = i; clearError(); render({ focus: true }); return;
   }
   if (type === 'examples') { openExamples(); return; }
+  if (type === 'choose-files') { $('#course-files').click(); return; }
+  if (type === 'remove-attachment') {
+    state.attachments.splice(i, 1);
+    render();
+    $('[data-action="choose-files"]')?.focus();
+    return;
+  }
   if (type === 'clear-input') {
-    state.input = ''; state.draft = null; state.plan = null; state.result = null; state.confirmationId = null; state.resolutions = {}; state.adjustment = ''; state.explanations = {};
+    state.input = ''; state.attachments = []; state.draft = null; state.plan = null; state.result = null; state.confirmationId = null; state.resolutions = {}; state.adjustment = ''; state.explanations = {};
     clearError(); render(); $('#course-input').focus(); return;
   }
   if (type === 'load-example') { await loadExample(button.dataset.id); return; }
   if (type === 'format') {
-    if (state.input.trim()) { openExamples(); return; }
+    if (state.input.trim() || state.attachments.length) { openExamples(); return; }
     state.input = state.examples[0]?.input || ''; render(); $('#course-input').focus(); return;
   }
   if (type === 'pick-provider') { selectProvider(button.dataset.id); closeSuggestions(); return; }
@@ -529,6 +772,12 @@ document.addEventListener('submit', event => {
   if (event.target.id === 'input-form') { event.preventDefault(); parseForm().catch(showError); }
   if (event.target.id === 'review-form') { event.preventDefault(); solveForm().catch(showError); }
   if (event.target.id === 'refinement-form') { event.preventDefault(); refineForm().catch(showError); }
+});
+
+document.addEventListener('change', event => {
+  if (event.target.id !== 'course-files') return;
+  const input = event.target;
+  addFiles(input.files).catch(showError).finally(() => { input.value = ''; });
 });
 
 $('#open-model').addEventListener('click', openModel);

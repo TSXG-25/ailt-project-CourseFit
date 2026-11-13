@@ -115,6 +115,24 @@
   #course-input { min-height: 330px; padding: 17px 18px; background: #fcfdff; font-size: calc(0.867rem * var(--font-scale-other)); border-color: #dce2ee; }
   .input-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 1px 17px; font-size: calc(0.733rem * var(--font-scale-other)); color: var(--muted); }
   #character-count { white-space: nowrap; flex-shrink: 0; }
+  .file-import { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 18px; align-items: center; padding: 15px 16px; margin: 0 0 12px; background: #fafbfe; border: 1px dashed #cbd4e7; border-radius: 8px; }
+  .file-import strong { font-size: calc(0.8rem * var(--font-scale-other)); font-weight: 620; }
+  .file-import p { color: var(--muted); font-size: calc(0.733rem * var(--font-scale-other)); line-height: 1.55; margin: 4px 0 0; }
+  .file-import .button { grid-column: 2; grid-row: 1; white-space: nowrap; }
+  .file-help { grid-column: 1; color: var(--muted); font-size: calc(0.667rem * var(--font-scale-other)); }
+  .attachment-list { list-style: none; display: grid; gap: 8px; padding: 0; margin: 0 0 16px; }
+  .attachment-list li { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 10px 12px; border: 1px solid #e1e6f0; border-radius: 7px; background: #fff; }
+  .attachment-icon { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; color: #5266a5; background: #eef1fb; border-radius: 6px; }
+  .attachment-icon .icon { width: 17px; height: 17px; }
+  .attachment-info { display: grid; gap: 2px; min-width: 0; flex: 1; }
+  .attachment-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(0.733rem * var(--font-scale-other)); font-weight: 600; }
+  .attachment-info small { color: var(--muted); font-size: calc(0.667rem * var(--font-scale-other)); line-height: 1.4; }
+  .attachment-preview { margin-top: 6px; color: var(--ink); font-size: calc(0.667rem * var(--font-scale-other)); }
+  .attachment-preview summary { width: fit-content; color: #5266a5; cursor: pointer; }
+  .attachment-preview pre { max-height: 190px; overflow: auto; margin: 8px 0 0; padding: 10px; border: 1px solid #e1e6f0; border-radius: 6px; background: #fafbfe; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .attachment-remove { border: 0; background: transparent; color: #5266a5; min-width: 44px; min-height: 44px; padding: 8px; font: inherit; font-size: calc(0.667rem * var(--font-scale-button)); cursor: pointer; }
+  .attachment-remove:hover { color: #9a3f4b; }
+  .attachment-status { margin: 0 0 15px; padding: 11px 13px; color: #455987; background: #f1f4fc; border-radius: 7px; font-size: calc(0.733rem * var(--font-scale-other)); }
   .privacy-note { display: flex; gap: 9px; font-size: calc(0.733rem * var(--font-scale-other)); color: var(--muted); line-height: 1.7; padding: 15px; background: var(--cloud); border-radius: 8px; }
   .privacy-note .icon { width: 15px; height: 15px; margin-top: 2px; }
   .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 22px; }
@@ -309,6 +327,12 @@
     .mini-event { font-size: calc(0.467rem * var(--font-scale-other)); }
     .mini-event small { font-size: calc(0.4rem * var(--font-scale-other)); }
     .free-day { font-size: calc(0.533rem * var(--font-scale-other)); }
+  }
+
+  @media (max-width: 560px) {
+    .file-import { grid-template-columns: 1fr; gap: 9px; }
+    .file-import .button, .file-help { grid-column: 1; grid-row: auto; }
+    .file-import .button { justify-self: start; }
   }
 
 }

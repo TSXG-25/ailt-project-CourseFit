@@ -6,13 +6,14 @@ Built for AILT9019. The application runs locally, with an English interface and 
 
 ## Start
 
-Install [Node.js 22 or later](https://nodejs.org/en/download), open a terminal in this repository, and run:
+Install [Node.js 22.13 or later](https://nodejs.org/en/download), open a terminal in this repository, and run:
 
 ```sh
+npm ci
 npm start
 ```
 
-Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)**. No dependency installation, database or build command is required. Keep the terminal running; press Ctrl+C to stop.
+Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)**. No database or build command is required. Keep the terminal running; press Ctrl+C to stop.
 
 1. Paste your course catalogue and preferences, then select **Generate my timetable**, or **Try an example** without a key.
 2. If essential details are unclear, answer one batch of up to five questions. Answers go straight into generation; there is no confirmation checkbox.
@@ -47,6 +48,12 @@ You can paste **Sem / Sub-class / Day / Time** tables. Rows with the same sectio
 
 Catalogue placeholders **00:00–08:00** and **00:00–08:20** automatically mean **online classes with no fixed weekly meeting**, even without a weekday. These sections remain selected courses but occupy no calendar slot. Other unknown times are never invented.
 
+## Screenshots and PDFs
+
+Select up to 8 PNG, JPEG, WebP, GIF or PDF files beside the text input. Text in a PDF is extracted in your browser. Screenshots and scanned pages are processed by bundled Tesseract.js OCR on your device; image pixels are not uploaded. OCR preserves approximate line and column spacing, but can misread table cells, so review the extracted text before generating. A PDF can contain up to 100 pages, with up to 8 scanned/image-only pages per request. Each file can be up to 20 MB and selected files can total up to 30 MB. Split a large scanned PDF or choose only its relevant pages.
+
+Files are not uploaded or saved by CourseFit. Locally extracted PDF/OCR text is shown under each attachment and, after generation, becomes part of the course source stored with the in-memory draft. Review course names and times against the original file before generating a timetable. Generating still sends your typed and extracted text to the selected language model; OCR itself makes no API call.
+
 Questions are optional to answer, and only asked once. Remaining ambiguity appears as interpretation notes with the result. Essential missing course data blocks generation and is listed with the same adjustment box, so you can supply times or explicitly omit an unavailable course without restarting. Use **Clear input** before replacing an example with your own catalogue.
 
 The input text budget is 100,000 characters; provider context/output limits still apply. Search has a four-second budget rather than course/section caps.
@@ -79,7 +86,7 @@ If no combination works, the app displays **No feasible schedule found** with a 
 - Unclear data appears in one batch of up to five questions. Applying answers generates directly; remaining issues are notes or missing-data blockers, never another required question round.
 - **Generate** and **Update timetable** authorize generation. The server saves a validated immutable snapshot internally, with no repeated acknowledgement step. Current plan data is authoritative for adjustments, so older restrictions are not restored accidentally.
 - An independent overlap and hard-constraint validator checks every returned timetable. The displayed meeting data is derived from the selected sections.
-- Parsing, answering questions and natural-language adjustments send course data to your provider's chat endpoint (the default DeepSeek setup uses `https://api.deepseek.com/chat/completions`). Optional model commentary sends the selected timetable and verified preference results. Complete examples and deterministic explanations do not call a model.
+- Parsing, answering questions and natural-language adjustments send typed and locally extracted course text to your provider's chat endpoint (the default DeepSeek setup uses `https://api.deepseek.com/chat/completions`). Optional model commentary sends the selected timetable and verified preference results. Complete examples and deterministic explanations do not call a model.
 - Do not enter names, student IDs, emails or other personal identifiers. Course data and generated snapshots are held in memory for up to two hours, with bounded storage, and disappear on server restart. Downloads are saved only when you select Save. API keys are never returned by server endpoints or included in timetable exports.
 - The server binds to `127.0.0.1`, rejects foreign hosts/origins, and only exposes explicitly allowed public assets. It is a single-user local application, not a multi-user hosted service.
 
@@ -91,7 +98,7 @@ CourseFit does not recommend courses, enrol students, check live seats, verify u
 npm test
 ```
 
-The dependency-free Node test suite covers 18 fixed solver scenarios against an independent exhaustive enumerator, 60 seeded additional cases, snapshot expiry/immutability, uncapped catalogue import, online placeholders, minimum breaks, one-round generation, direct adjustments and search deadlines, model correction limits, data provenance checks, HTTP flows, secret storage/redaction and safe failure.
+The Node built-in test suite covers 18 fixed solver scenarios against an independent exhaustive enumerator, 60 seeded additional cases, snapshot expiry/immutability, uncapped catalogue import, online placeholders, minimum breaks, one-round generation, direct adjustments and search deadlines, model correction limits, data provenance checks, HTTP flows, secret storage/redaction and safe failure.
 
 The fixed language evaluation set contains **22 manually prepared requests and expected representations**, including 5 deliberately ambiguous cases. To measure the real model:
 
@@ -106,8 +113,9 @@ This uses a key saved with **Remember the key** or supplied through `.env` and e
 ## Project layout
 
 ```text
-public/       Responsive English UI; no external runtime assets
+public/       Responsive English UI
 server/       Local HTTP API, parser, generation workflow, snapshot store, solver and validator
+node_modules/ PDF.js and Tesseract.js runtimes plus bundled OCR language data, served locally for PDF extraction, scanned-page rendering and device-side OCR
 evaluation/   Fixed language/solver cases, evaluation metrics and exhaustive oracle
 test/         Node unit and HTTP integration tests
 scripts/      Real-model parsing evaluation
@@ -120,4 +128,7 @@ See [architecture](docs/architecture.md) for API and implementation details. MCP
 
 - [DeepSeek JSON Output](https://api-docs.deepseek.com/guides/json_mode/) — JSON mode, explicit JSON prompt and handling incomplete/empty content.
 - [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/) — endpoint, request fields and thinking switch.
+- [Tesseract.js local installation](https://github.com/naptha/tesseract.js/blob/master/docs/local-installation.md) — serve the worker, WebAssembly core and language data locally.
+- [Tesseract table recognition notes](https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html) — OCR output may need table layout handling.
+- [PDF.js examples](https://mozilla.github.io/pdf.js/examples/) — local PDF loading, text extraction and page rendering.
 - [DeepSeek API setup](https://api-docs.deepseek.com/) — current model names and API endpoint. Model names can change; Settings keeps this configurable.
