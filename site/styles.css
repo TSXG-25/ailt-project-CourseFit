@@ -253,12 +253,13 @@
 
   /* Gallery */
   .gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
-  .shot-frame { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; box-shadow: var(--shadow-sm); }
-  .shot-frame img { width: 100%; height: auto; }
+  .shot-frame { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; box-shadow: var(--shadow-sm); aspect-ratio: 1600 / 1044; display: grid; place-items: center; }
+  .shot-frame img { width: 100%; height: 100%; object-fit: contain; }
   .shot figcaption { padding-top: 16px; }
   .shot h3 { font-size: .9875rem; margin-bottom: 6px; }
   .shot p { color: var(--body); font-size: .875rem; line-height: 1.6; }
   .gallery-note { margin-top: 26px; font-size: .8125rem; color: var(--muted); }
+  .feature-note { margin-top: 22px; font-size: .875rem; line-height: 1.6; color: var(--muted); max-width: 78ch; }
 
   /* Engineering */
   .dark-grid { display: grid; grid-template-columns: minmax(0, 1.06fr) minmax(0, .94fr); gap: clamp(36px, 5.5vw, 72px); align-items: start; }

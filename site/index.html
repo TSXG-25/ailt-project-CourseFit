@@ -77,8 +77,8 @@
             </a>
           </div>
           <ul class="hero-facts" aria-label="At a glance">
-            <li>Node.js 22+</li>
-            <li>Zero runtime dependencies</li>
+            <li>Node.js 22.13+</li>
+            <li>On-device PDF &amp; OCR</li>
             <li>Binds to 127.0.0.1</li>
           </ul>
         </div>
@@ -174,6 +174,7 @@
             <p>Fine-tune in ordinary language: “Allow 09:00 classes, keep Friday free.” The current plan is the source of truth, so unaffected courses stay put.</p>
           </article>
         </div>
+        <p class="feature-note">Also included: up to eight PDFs or screenshots per input, with PDF text extraction and OCR running on your device; catalogue placeholders for online classes; and no course, section or meeting caps.</p>
       </div>
     </section>
 
@@ -241,12 +242,12 @@
             <div class="shot-frame">
               <picture>
                 <source srcset="assets/planner-input.webp" type="image/webp">
-                <img src="assets/planner-input.png" width="1600" height="1044" alt="Input screen with a course catalogue pasted into a text area, a character budget and a preview timetable panel.">
+                <img src="assets/planner-input.png" width="1600" height="1156" alt="Input screen with a pasted course catalogue, a character budget, an option to add a screenshot or PDF, and a preview timetable panel.">
               </picture>
             </div>
             <figcaption>
               <h3>Start from your shortlist</h3>
-              <p>A plain text area with a 100,000-character budget, a live preview and examples that run without a model key.</p>
+              <p>A plain text area with a 100,000-character budget, plus PDF and screenshot import that runs on your device.</p>
             </figcaption>
           </figure>
 
@@ -289,7 +290,7 @@
             <p class="section-lead dark-lead">The model is only the parser. Everything that decides a timetable — search, scoring, validation and the exhaustive reference — is deterministic code you can read and test.</p>
 
             <ol class="pipeline" aria-label="Generation pipeline">
-              <li><span class="pipe-num">01</span><div><h3>Input</h3><p>Courses, sections, meeting times and preferences as plain text.</p></div></li>
+              <li><span class="pipe-num">01</span><div><h3>Input</h3><p>Courses, sections and preferences — typed, pasted, or read from a PDF or screenshot on your device.</p></div></li>
               <li><span class="pipe-num">02</span><div><h3>Extract</h3><p>Your chosen provider returns JSON with evidence quotes, in JSON mode, with a 90-second timeout.</p></div></li>
               <li><span class="pipe-num">03</span><div><h3>Verify</h3><p>Schema and quote checks against the original text. At most one correction request, then a safe failure.</p></div></li>
               <li><span class="pipe-num">04</span><div><h3>Ask once</h3><p>Up to five consolidated questions, only when essential facts are unclear or missing.</p></div></li>
@@ -302,7 +303,7 @@
           </div>
 
           <aside class="dark-aside" aria-label="Engineering facts">
-            <div class="stat"><strong>0</strong><span>runtime dependencies — Node.js built-ins only</span></div>
+            <div class="stat"><strong>0</strong><span>file uploads — PDF text extraction and OCR run in your browser</span></div>
             <div class="stat"><strong>69</strong><span>automated tests, including HTTP integration</span></div>
             <div class="stat"><strong>78</strong><span>solver scenarios matched to an exhaustive oracle</span></div>
             <div class="stat"><strong>4 s</strong><span>search budget, 20 options displayed</span></div>
@@ -369,7 +370,7 @@
             <span class="icon-box tone-green"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg></span>
             <h3>On your machine</h3>
             <ul class="ticks">
-              <li>The solver, ranking, validation, examples and this page’s data never leave the computer.</li>
+              <li>The solver, ranking, validation, PDF text extraction and OCR run on the computer; screenshots are not uploaded.</li>
               <li>Drafts and results live in memory for up to two hours and vanish on restart.</li>
               <li>API keys are stored in <code>.local/</code> with owner-only permissions, excluded from Git, or kept for the session only.</li>
               <li>The server binds to loopback and rejects foreign hosts and origins.</li>
@@ -405,11 +406,12 @@
           <div class="start-copy">
             <p class="kicker">08 — Get started</p>
             <h2 id="start-title">Run it in a minute.</h2>
-            <p>Node.js 22 or later, no install step, no build, no database. The planner starts on your machine and opens in the browser.</p>
+            <p>Node.js 22.13 or later. Install the PDF and OCR dependencies once with <code>npm ci</code>; there is no build step and no database.</p>
             <ol class="start-steps">
-              <li><span class="start-step-num">1</span><span>Install Node.js 22+.</span></li>
+              <li><span class="start-step-num">1</span><span>Install Node.js 22.13+.</span></li>
               <li><span class="start-step-num">2</span><span>Clone the repository.</span></li>
-              <li><span class="start-step-num">3</span><span>Run <code>npm start</code>, then open <code>127.0.0.1:3000</code></span></li>
+              <li><span class="start-step-num">3</span><span>Run <code>npm ci</code>, then <code>npm start</code></span></li>
+              <li><span class="start-step-num">4</span><span>Open <code>127.0.0.1:3000</code></span></li>
             </ol>
             <div class="start-actions">
               <a class="button button-primary" href="https://github.com/TSXG-25/ailt-project-CourseFit" target="_blank" rel="noopener">
@@ -431,13 +433,14 @@
               <div class="terminal-head">
                 <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span>terminal</span>
-                <button class="copy-button" type="button" data-copy="git clone https://github.com/TSXG-25/ailt-project-CourseFit.git&#10;cd ailt-project-CourseFit&#10;npm start">
+                <button class="copy-button" type="button" data-copy="git clone https://github.com/TSXG-25/ailt-project-CourseFit.git&#10;cd ailt-project-CourseFit&#10;npm ci&#10;npm start">
                   <svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>
                   <span aria-live="polite">Copy</span>
                 </button>
               </div>
               <pre class="terminal-body" aria-label="Commands to run CourseFit"><code><span class="t-prompt">$</span> git clone https://github.com/TSXG-25/ailt-project-CourseFit.git
 <span class="t-prompt">$</span> cd ailt-project-CourseFit
+<span class="t-prompt">$</span> npm ci
 <span class="t-prompt">$</span> npm start
 <span class="t-out">CourseFit is ready at http://127.0.0.1:3000</span></code></pre>
             </div>

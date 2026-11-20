@@ -110,6 +110,18 @@ This uses a key saved with **Remember the key** or supplied through `.env` and e
 
 **Fixed-set model accuracy has not yet been measured.** A separately authorized real catalogue regression passed, but it does not establish the proposal's accuracy targets. Mock provider tests validate integration and failure handling. See [verification notes](docs/verification.md) for completed checks and remaining validation.
 
+## Project webpage
+
+`site/` holds a static project page: the problem, the working behaviour, screenshots from the running app, engineering notes and the verification record. It is plain HTML, CSS and a small script with no build step and no external requests.
+
+Preview it locally:
+
+```sh
+python -m http.server 8080 --directory site
+```
+
+Then open **http://127.0.0.1:8080**. To publish it, set **Settings → Pages → Source** to **GitHub Actions**; `.github/workflows/pages.yml` deploys `site/` on each push to `main` that changes it. See [site/README.md](site/README.md) for details.
+
 ## Project layout
 
 ```text
@@ -120,9 +132,10 @@ evaluation/   Fixed language/solver cases, evaluation metrics and exhaustive ora
 test/         Node unit and HTTP integration tests
 scripts/      Real-model parsing evaluation
 docs/         Architecture, design and verification notes
+site/         Static project webpage published with GitHub Pages
 ```
 
-See [architecture](docs/architecture.md) for API and implementation details. MCP packaging, offline model integration, preference weights, detailed infeasibility diagnosis and a public project webpage remain optional follow-up work.
+See [architecture](docs/architecture.md) for API and implementation details. MCP packaging, offline model integration, preference weights and detailed infeasibility diagnosis remain optional follow-up work.
 
 ## Implementation references
 
